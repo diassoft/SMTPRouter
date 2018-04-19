@@ -3,7 +3,12 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27428.2037
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SMTPRouter", "SMTPRouter\SMTPRouter.csproj", "{CF8A35B5-A9CB-4582-BA0C-84C34C34E68C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SMTPRouter", "SMTPRouter\SMTPRouter.csproj", "{CF8A35B5-A9CB-4582-BA0C-84C34C34E68C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{028C3594-6FB3-4BEB-B1CB-ED17BC158191}"
+	ProjectSection(SolutionItems) = preProject
+		README.MD = README.MD
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
