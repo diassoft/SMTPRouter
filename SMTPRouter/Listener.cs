@@ -25,6 +25,23 @@ namespace SMTPRouter
         /// </summary>
         public bool IsListening { get; private set; }
 
+        /// <summary>
+        /// Name of the Server where the services will run
+        /// </summary>
+        public string ServerName { get; set; }
+        /// <summary>
+        /// Ports where the SMTP Service will be available
+        /// </summary>
+        public int[] Ports { get; set; }
+        /// <summary>
+        /// Defines whether it's necessary to use SSL or not
+        /// </summary>
+        public bool UseSSL { get; set; }
+        /// <summary>
+        /// Defines whether the SMTP Requires authentication
+        /// </summary>
+        public bool RequiresAuthentication { get; set; }
+
         #endregion Properties
 
         #region Events
@@ -61,122 +78,50 @@ namespace SMTPRouter
         /// <summary>
         /// Initializes a new instance of a Smtp Listener
         /// </summary>
-        public Listener()
+        public Listener(): this("", null) { }
+
+        /// <summary>
+        /// Initializes a new instance of a Smtp Listener
+        /// </summary>
+        /// <param name="serverName">The Server Name (usually localhost)</param>
+        /// <param name="ports">Ports where the service will be available</param>
+        public Listener(string serverName, int[] ports): this(serverName, ports, false) { }
+
+        /// <summary>
+        /// Initializes a new instance of a Smtp Listener
+        /// </summary>
+        /// <param name="serverName">The Server Name (usually localhost)</param>
+        /// <param name="ports">Ports where the service will be available</param>
+        /// <param name="requiresAuthentication">A flag to define whether authentication is required for this smtp server</param>
+        public Listener(string serverName, int[] ports, bool requiresAuthentication): this(serverName, ports, requiresAuthentication, false) { }
+
+        /// <summary>
+        /// Initializes a new instance of a Smtp Listener
+        /// </summary>
+        /// <param name="serverName">The Server Name (usually localhost)</param>
+        /// <param name="ports">Ports where the service will be available</param>
+        /// <param name="requiresAuthentication">A flag to define whether authentication is required for this smtp server</param>
+        /// <param name="useSSL">A flag to define whether it is necessary to use SSL</param>
+        public Listener(string serverName, int[] ports, bool requiresAuthentication, bool useSSL)
         {
+            this.ServerName = serverName;
+            this.Ports = ports;
+            this.RequiresAuthentication = requiresAuthentication;
+            this.UseSSL = useSSL;
+
             IsListening = false;
         }
 
         #endregion Constructors
 
-        /// <summary>
-        /// Initializes a new instance of the Listener
-        /// </summary>
-        /// <param name="serverName">The Hostname (usually Localhost or 127.0.0.1)</param>
-        /// <param name="ports">The ports where the service should be initialized</param>
-        /// <returns>An awaitable <see cref="Task"/> with the listener to Smtp Messages</returns>
-        public async Task StartAsync(string serverName, params int[] ports)
-        {
-            await StartAsync(CancellationToken.None, serverName, ports, false, false);
-        }
+        #region Initialization Methods
 
         /// <summary>
         /// Initializes a new instance of the Listener
         /// </summary>
         /// <param name="cancellationToken">The Cancellation Token to stop a transaction</param>
-        /// <param name="serverName">The Hostname (usually Localhost or 127.0.0.1)</param>
-        /// <param name="ports">The ports where the service should be initialized</param>
         /// <returns>An awaitable <see cref="Task"/> with the listener to Smtp Messages</returns>
-        public async Task StartAsync(CancellationToken cancellationToken, string serverName, params int[] ports)
-        {
-            await StartAsync(cancellationToken, serverName, ports, false, false);
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the Listener
-        /// </summary>
-        /// <param name="serverName">The Hostname (usually Localhost or 127.0.0.1)</param>
-        /// <param name="port">The port where the service should be initialized</param>
-        /// <param name="requiresAuthentication">A flag to define whether the Smtp Requires authentication or not</param>
-        /// <returns>An awaitable <see cref="Task"/> with the listener to Smtp Messages</returns>
-        public async Task StartAsync(string serverName, int port, bool requiresAuthentication)
-        {
-            await StartAsync(CancellationToken.None, serverName, new int[] { port });
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the Listener
-        /// </summary>
-        /// <param name="serverName">The Hostname (usually Localhost or 127.0.0.1)</param>
-        /// <param name="ports">The ports where the service should be initialized</param>
-        /// <param name="requiresAuthentication">A flag to define whether the Smtp Requires authentication or not</param>
-        /// <returns>An awaitable <see cref="Task"/> with the listener to Smtp Messages</returns>
-        public async Task StartAsync(string serverName, int[] ports, bool requiresAuthentication)
-        {
-            await StartAsync(CancellationToken.None, serverName, ports, requiresAuthentication, false);
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the Listener
-        /// </summary>
-        /// <param name="cancellationToken">The Cancellation Token to stop a transaction</param>
-        /// <param name="serverName">The Hostname (usually Localhost or 127.0.0.1)</param>
-        /// <param name="port">The port where the service should be initialized</param>
-        /// <param name="requiresAuthentication">A flag to define whether the Smtp Requires authentication or not</param>
-        /// <returns>An awaitable <see cref="Task"/> with the listener to Smtp Messages</returns>
-        public async Task StartAsync(CancellationToken cancellationToken, string serverName, int port, bool requiresAuthentication)
-        {
-            await StartAsync(cancellationToken, serverName, new int[] { port }, requiresAuthentication, false);
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the Listener
-        /// </summary>
-        /// <param name="cancellationToken">The Cancellation Token to stop a transaction</param>
-        /// <param name="serverName">The Hostname (usually Localhost or 127.0.0.1)</param>
-        /// <param name="ports">The ports where the service should be initialized</param>
-        /// <param name="requiresAuthentication">A flag to define whether the Smtp Requires authentication or not</param>
-        /// <returns>An awaitable <see cref="Task"/> with the listener to Smtp Messages</returns>
-        public async Task StartAsync(CancellationToken cancellationToken, string serverName, int[] ports, bool requiresAuthentication)
-        {
-            await StartAsync(cancellationToken, serverName, ports, requiresAuthentication, false);
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the Listener
-        /// </summary>
-        /// <param name="serverName">The Hostname (usually Localhost or 127.0.0.1)</param>
-        /// <param name="port">The port where the service should be initialized</param>
-        /// <param name="requiresAuthentication">A flag to define whether the Smtp Requires authentication or not</param>
-        /// <param name="useSSL">A flag to define whether the connection will use SSL or not. Usually when SSL is activated the port should be 465.</param>
-        /// <returns>An awaitable <see cref="Task"/> with the listener to Smtp Messages</returns>
-        public async Task StartAsync(string serverName, int port, bool requiresAuthentication, bool useSSL)
-        {
-            await StartAsync(CancellationToken.None, serverName, new int[] { port }, requiresAuthentication, useSSL);
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the Listener
-        /// </summary>
-        /// <param name="serverName">The Hostname (usually Localhost or 127.0.0.1)</param>
-        /// <param name="ports">The ports where the service should be initialized</param>
-        /// <param name="requiresAuthentication">A flag to define whether the Smtp Requires authentication or not</param>
-        /// <param name="useSSL">A flag to define whether the connection will use SSL or not. Usually when SSL is activated the port should be 465.</param>
-        /// <returns>An awaitable <see cref="Task"/> with the listener to Smtp Messages</returns>
-        public async Task StartAsync(string serverName, int[] ports, bool requiresAuthentication, bool useSSL)
-        {
-            await StartAsync(CancellationToken.None, serverName, ports, requiresAuthentication, useSSL);
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the Listener
-        /// </summary>
-        /// <param name="cancellationToken">The Cancellation Token to stop a transaction</param>
-        /// <param name="serverName">The Hostname (usually Localhost or 127.0.0.1)</param>
-        /// <param name="ports">The ports where the service should be initialized</param>
-        /// <param name="requiresAuthentication">A flag to define whether the Smtp Requires authentication or not</param>
-        /// <param name="useSSL">A flag to define whether the connection will use SSL or not. Usually when SSL is activated the port should be 465.</param>
-        /// <returns>An awaitable <see cref="Task"/> with the listener to Smtp Messages</returns>
-        public async Task StartAsync(CancellationToken cancellationToken, string serverName, int[] ports, bool requiresAuthentication, bool useSSL)
+        public async Task StartAsync(CancellationToken cancellationToken)
         {
             // Parameters for the SMTP Server
             ISmtpServerOptions options;
@@ -186,14 +131,14 @@ namespace SMTPRouter
             smtpMessageStore.MessageReceived += SmtpMessageStore_MessageReceived;
 
             // Configure the SMTP Server Parameters
-            if (requiresAuthentication)
+            if (this.RequiresAuthentication)
             {
                 // Setup the UserAuthenticator
                 SmtpAuthenticator smtpAuthenticator = new SmtpAuthenticator();
 
-                options = new SmtpServerOptionsBuilder().ServerName(serverName)
-                                                        .Port(ports)
-                                                        .AllowUnsecureAuthentication(!useSSL)
+                options = new SmtpServerOptionsBuilder().ServerName(this.ServerName)
+                                                        .Port(this.Ports)
+                                                        .AllowUnsecureAuthentication(!this.UseSSL)
                                                         .AuthenticationRequired(true)
                                                         .MessageStore(smtpMessageStore)
                                                         .UserAuthenticator(smtpAuthenticator)
@@ -201,9 +146,9 @@ namespace SMTPRouter
             }
             else
             {
-                options = new SmtpServerOptionsBuilder().ServerName(serverName)
-                                                        .Port(ports)
-                                                        .AllowUnsecureAuthentication(!useSSL)
+                options = new SmtpServerOptionsBuilder().ServerName(this.ServerName)
+                                                        .Port(this.Ports)
+                                                        .AllowUnsecureAuthentication(!this.UseSSL)
                                                         .AuthenticationRequired(false)
                                                         .MessageStore(smtpMessageStore)
                                                         .Build();
@@ -224,6 +169,7 @@ namespace SMTPRouter
             await Server.StartAsync(cancellationToken);
         }
 
+        #endregion Initialization Methods
 
         #region Internal Event Handlers
 

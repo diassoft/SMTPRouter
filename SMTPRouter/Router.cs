@@ -124,6 +124,10 @@ namespace SMTPRouter
             // Set the folder structure
             Folders = new WorkingFolders(queuePath);
 
+            // Initialize Collections
+            DestinationSmtps = new Dictionary<string, SmtpConfiguration>();
+            RoutingRules = new List<RoutingRule>();
+
             // Initialize Queues
             try
             {
@@ -157,7 +161,7 @@ namespace SMTPRouter
 
         #endregion Initialization Methods
 
-        #region Queue Processing Methods
+        #region Queue Methods
 
         /// <summary>
         /// Processes the messages on the Outgoing Queue
@@ -174,24 +178,24 @@ namespace SMTPRouter
                     try
                     {
                         // Get all files to process (since the number of files is usually small, it is ok to use GetFiles method)
-                        string[] filesToProcess = Directory.GetFiles(Folders.OutgoingFolder, "*.EML");
-                        Array.Sort<string>(filesToProcess);
-
-                        // Process each file on the queue
-                        foreach (string file in filesToProcess)
+                        DirectoryInfo dirInfo = new DirectoryInfo(Folders.OutgoingFolder);
+                        IEnumerable<FileInfo> files = dirInfo.EnumerateFiles("*.EML");
+                        
+                        // Process each file on the queue, but sort it by creation time
+                        foreach (FileInfo fi in (from f in files orderby f.CreationTime select f))
                         {
                             MimeMessage message = null;
 
                             try
                             {
                                 // Load MimeMessage
-                                message = MimeMessage.Load(file);
+                                message = MimeMessage.Load(fi.FullName);
 
                                 // Routes the Message
                                 RouteMessage(message);
 
                                 // Send it to the SentFolder
-                                File.Move(file, Path.Combine(Folders.SentFolder, Path.GetFileName(file)));
+                                File.Move(fi.FullName, Path.Combine(Folders.SentFolder, Path.GetFileName(fi.FullName)));
 
                                 // Throws the event to inform the message was sent
                                 MessageRoutedSuccessfully?.Invoke(this, new MessageEventArgs(message));
@@ -199,17 +203,15 @@ namespace SMTPRouter
                             catch (Exception e)
                             {
                                 // Get the file information
-                                FileInfo fi = new FileInfo(file);
-                                
                                 if ((DateTime.Now - fi.CreationTime).TotalSeconds > MessageLifespan.TotalSeconds)
                                 {
                                     // Message Expired the Lifespan, send it to the error queue
-                                    File.Move(file, Path.Combine(Folders.ErrorFolder, Path.GetFileName(file)));
+                                    File.Move(fi.FullName, Path.Combine(Folders.ErrorFolder, Path.GetFileName(fi.FullName)));
                                 }
                                 else
                                 {
                                     // Message did not expire the Lifespan, send it to the retry queue
-                                    File.Move(file, Path.Combine(Folders.RetryFolder, Path.GetFileName(file)));
+                                    File.Move(fi.FullName, Path.Combine(Folders.RetryFolder, Path.GetFileName(fi.FullName)));
                                 }
 
                                 // Invoke the MessageNotRouted Event
@@ -351,7 +353,33 @@ namespace SMTPRouter
             }
         }
 
-        #endregion Queue Processing Methods
+        /// <summary>
+        /// Adds a message to the proper queue
+        /// </summary>
+        /// <param name="message"></param>
+        public void Enqueue(MimeMessage message)
+        {
+            // Defines the file name
+            string messageFilename = string.Format("{0}-{1}.EML", DateTime.Now.ToString("yyyyMMddHHmmss"), Guid.NewGuid().ToString());
+
+            try
+            {
+                // Defines the format of the file
+                FormatOptions dosLineFormat = new FormatOptions()
+                {
+                    NewLineFormat = NewLineFormat.Dos,
+                };
+
+                // Writes it to a text file
+                message.WriteTo(dosLineFormat, Path.Combine(Folders.OutgoingFolder, messageFilename));
+            }
+            catch (Exception e)
+            {
+                throw new Exception("Unable to Enqueue message", e);
+            }
+        }
+
+        #endregion Queue Methods
 
         #region Setup Data Load Methods
 
