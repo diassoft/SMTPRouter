@@ -22,11 +22,7 @@
 
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net461|AnyCPU'">
     <DocumentationFile>bin\Release\net461\SMTPRouter.xml</DocumentationFile>
-  </PropertyGroup>  
-  
-  <ItemGroup>
-    <Folder Include="Exceptions\" />
-  </ItemGroup>
+  </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Diassoft.Mvvm" Version="1.0.0.4" />

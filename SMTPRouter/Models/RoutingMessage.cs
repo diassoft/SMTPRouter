@@ -37,7 +37,7 @@ namespace SMTPRouter.Models
         
         private Stream _rawMessage;
         /// <summary>
-        /// A <see cref="Stream"/> containing the <see cref="MimeMessage"/>
+        /// A <see cref="Stream"/> containing the <see cref="RoutingMessage"/>
         /// </summary>
         public Stream RawMessage
         {
@@ -48,7 +48,7 @@ namespace SMTPRouter.Models
 
         private string _rawMessage;
         /// <summary>
-        /// A <see cref="string"/> containing the <see cref="MimeMessage"/>
+        /// A <see cref="string"/> containing the <see cref="RoutingMessage"/>
         /// </summary>
         /// <remarks>Ensure to have the RawMessage use <see cref="NewLineFormat.Dos"/> as the new line format</remarks>
         public string RawMessage
@@ -56,7 +56,7 @@ namespace SMTPRouter.Models
             get { return _rawMessage; }
             set { SetProperty<string>(ref _rawMessage, value); }
         }
-        
+
 #endif
 
         /// <summary>
@@ -67,7 +67,10 @@ namespace SMTPRouter.Models
             get
             {
                 MimeMessage message;
+
 #if (NET20 || NET35 || NET40 || NET45 || NET451 || NET452 || NET46 || NET461 || NET461 || NET47 || NET471)
+
+                // Load Message from Stream (.NET Framework Only)
                 _rawMessage.Position = 0;
                 message = MimeMessage.Load(_rawMessage);
 #else
