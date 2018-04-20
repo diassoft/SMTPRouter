@@ -1,4 +1,5 @@
 ﻿using SMTPRouter.Models;
+using SmtpServer;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -39,7 +40,7 @@ namespace SMTPRouter
         /// <summary>
         /// Defines whether the SMTP Requires authentication
         /// </summary>
-        public bool RequireAuthentication { get; set; }
+        public bool RequiresAuthentication { get; set; }
 
         #endregion Listener Properties
 
@@ -89,6 +90,19 @@ namespace SMTPRouter
         /// </summary>
         public event EventHandler<MessageEventArgs> MessageReceived;
 
+        /// <summary>
+        /// Event trigered when a SMTP Command is being executed
+        /// </summary>
+        public event EventHandler<SmtpCommandExecutingEventArgs> SessionCommandExecuting;
+        /// <summary>
+        /// Event triggered when a SMTP Session is created
+        /// </summary>
+        public event EventHandler<SessionEventArgs> SessionCreated;
+        /// <summary>
+        /// Event triggered when a SMTP Session is closed
+        /// </summary>
+        public event EventHandler<SessionEventArgs> SessionCompleted;
+
         #endregion Listener Events
 
         #region Router Events
@@ -121,17 +135,28 @@ namespace SMTPRouter
         /// <summary>
         /// Initializes a new Server Instance
         /// </summary>
-        /// <param name="serverName"></param>
-        /// <param name="ports"></param>
-        /// <param name="requireAuthentication"></param>
-        /// <param name="useSSL"></param>
-        /// <param name="queueName"></param>
-        /// <param name="queuePath"></param>
-        public Server(string serverName, int[] ports, bool requireAuthentication, bool useSSL, string queueName, string queuePath)
+        /// <param name="serverName">The Server Name (usually localhost)</param>
+        /// <param name="port">Port where the service will be available</param>
+        /// <param name="requiresAuthentication">A flag to define whether authentication is required for this smtp server</param>
+        /// <param name="useSSL">A flag to define whether it is necessary to use SSL</param>
+        /// <param name="queueName">Name of the Queue</param>
+        /// <param name="queuePath">Root folder where the queue will be located. Ensure you have permissions on that folder.</param>
+        public Server(string serverName, int port, bool requiresAuthentication, bool useSSL, string queueName, string queuePath): this(serverName, new int[] { port }, requiresAuthentication, useSSL, queueName, queuePath) { }
+
+        /// <summary>
+        /// Initializes a new Server Instance
+        /// </summary>
+        /// <param name="serverName">The Server Name (usually localhost)</param>
+        /// <param name="ports">Ports where the service will be available</param>
+        /// <param name="requiresAuthentication">A flag to define whether authentication is required for this smtp server</param>
+        /// <param name="useSSL">A flag to define whether it is necessary to use SSL</param>
+        /// <param name="queueName">Name of the Queue</param>
+        /// <param name="queuePath">Root folder where the queue will be located. Ensure you have permissions on that folder.</param>
+        public Server(string serverName, int[] ports, bool requiresAuthentication, bool useSSL, string queueName, string queuePath)
         {
             ServerName = serverName;
             Ports = ports;
-            RequireAuthentication = requireAuthentication;
+            RequiresAuthentication = requiresAuthentication;
             UseSSL = useSSL;
             QueueName = queueName;
             QueuePath = queuePath;
@@ -151,7 +176,10 @@ namespace SMTPRouter
             // Validate Variables before starting the service
 
             // Initializes the Listener and hook events
-            this.Listener = new Listener(this.ServerName, this.Ports, this.RequireAuthentication, this.UseSSL);
+            this.Listener = new Listener(this.ServerName, this.Ports, this.RequiresAuthentication, this.UseSSL);
+            this.Listener.SessionCreated += Listener_SessionCreated;
+            this.Listener.SessionCompleted += Listener_SessionCompleted;
+            this.Listener.SessionCommandExecuting += Listener_SessionCommandExecuting;
             this.Listener.ListeningStarted += Listener_ListeningStarted;
             this.Listener.MessageReceived += Listener_MessageReceived;
 
@@ -175,6 +203,21 @@ namespace SMTPRouter
 
         #region Internal Event Handlers
 
+        private void Listener_SessionCommandExecuting(object sender, SmtpServer.SmtpCommandExecutingEventArgs e)
+        {
+            SessionCommandExecuting?.Invoke(sender, e);
+        }
+
+        private void Listener_SessionCompleted(object sender, SmtpServer.SessionEventArgs e)
+        {
+            SessionCompleted?.Invoke(sender, e);
+        }
+
+        private void Listener_SessionCreated(object sender, SmtpServer.SessionEventArgs e)
+        {
+            SessionCreated?.Invoke(sender, e);
+        }
+
         /// <summary>
         /// Event triggered when the Router successfully routed a message
         /// </summary>
@@ -194,7 +237,7 @@ namespace SMTPRouter
         private void Router_MessageNotRouted(object sender, MessageErrorEventArgs e)
         {
             // Raises the MessageNotRoutedSuccesfully Event
-            MessageRoutedSuccessfully?.Invoke(sender, e);
+            MessageNotRouted?.Invoke(sender, e);
         }
 
         /// <summary>

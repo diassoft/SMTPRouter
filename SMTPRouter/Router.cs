@@ -54,7 +54,7 @@ namespace SMTPRouter
         /// <summary>
         /// A structure representing the queue folders
         /// </summary>
-        public WorkingFolders Folders { get; set; }
+        public WorkingFolders Folders { get; internal set; }
 
         /// <summary>
         /// The <see cref="TimeSpan"/> a message is stil considered valid. By default, a message lasts 15 minutes after its creation time
