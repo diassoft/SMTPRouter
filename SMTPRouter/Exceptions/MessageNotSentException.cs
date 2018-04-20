@@ -1,4 +1,5 @@
-﻿using SMTPRouter.Models;
+﻿using MimeKit;
+using SMTPRouter.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -18,7 +19,7 @@ namespace SMTPRouter
         /// <summary>
         /// The Message that could not be routed
         /// </summary>
-        public RoutingMessage RoutingMessage { get; set; }
+        public MimeMessage MimeMessage { get; set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MessageNotSentException"/>
@@ -31,8 +32,8 @@ namespace SMTPRouter
         /// <summary>
         /// Initializes a new instance of the <see cref="MessageNotSentException"/>
         /// </summary>
-        /// <param name="routingMessage">The Message that could not be routed</param>
-        public MessageNotSentException(RoutingMessage routingMessage): this(null, null)
+        /// <param name="message">The Message that could not be routed</param>
+        public MessageNotSentException(MimeMessage message): this(null, null)
         {
 
         }
@@ -40,11 +41,11 @@ namespace SMTPRouter
         /// <summary>
         /// Initializes a new instance of the <see cref="MessageNotSentException"/>
         /// </summary>
-        /// <param name="routingMessage">The Message that could not be routed</param>
+        /// <param name="message">The Message that could not be routed</param>
         /// <param name="innerException">The inner exception that caused the message to not be routed properly</param>
-        public MessageNotSentException(RoutingMessage routingMessage, Exception innerException): base(DEFAULTROUTINGMESSAGE, innerException)
+        public MessageNotSentException(MimeMessage message, Exception innerException): base(DEFAULTROUTINGMESSAGE, innerException)
         {
-            RoutingMessage = routingMessage;
+            MimeMessage = message;
         }
     }
 }

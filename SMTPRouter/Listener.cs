@@ -37,7 +37,7 @@ namespace SMTPRouter
         /// <summary>
         /// Event triggered when a message is received
         /// </summary>
-        public event EventHandler<MessageReceivedEventArgs> MessageReceived;
+        public event EventHandler<MessageEventArgs> MessageReceived;
 
         /// <summary>
         /// Event triggered when an SMTP Session is created
@@ -227,7 +227,7 @@ namespace SMTPRouter
 
         #region Internal Event Handlers
 
-        private void SmtpMessageStore_MessageReceived(object sender, MessageReceivedEventArgs e)
+        private void SmtpMessageStore_MessageReceived(object sender, MessageEventArgs e)
         {
             // Trigger the MessageReceived event for the Listener
             MessageReceived?.Invoke(sender, e);

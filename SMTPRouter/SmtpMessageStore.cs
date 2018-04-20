@@ -17,7 +17,7 @@ namespace SMTPRouter
         /// <summary>
         /// Event triggered when a message is received
         /// </summary>
-        public event EventHandler<MessageReceivedEventArgs> MessageReceived;
+        public event EventHandler<MessageEventArgs> MessageReceived;
 
         /// <summary>
         /// Initializes a new instance of the SmtpMessageStore
@@ -43,7 +43,7 @@ namespace SMTPRouter
                 var mimeMessage = MimeKit.MimeMessage.Load(textMessage.Content);
 
                 // Trigger Event to inform a message was received
-                MessageReceived?.Invoke(this, new MessageReceivedEventArgs(mimeMessage));
+                MessageReceived?.Invoke(this, new MessageEventArgs(mimeMessage));
             }
             catch
             {

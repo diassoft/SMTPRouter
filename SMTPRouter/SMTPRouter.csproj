@@ -5,7 +5,7 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DocumentationFile>bin\Debug\netstandard1.2\Diassoft.Mvvm.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\netstandard1.3\SMTPRouter.xml</DocumentationFile>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|netstandard1.3|AnyCPU'">
@@ -29,6 +29,7 @@
     <PackageReference Include="MailKit" Version="2.0.3" />
     <PackageReference Include="MimeKit" Version="2.0.3" />
     <PackageReference Include="SmtpServer" Version="5.0.0" />
+    <PackageReference Include="System.Linq" Version="4.3.0" />
   </ItemGroup>
 
   <ItemGroup>

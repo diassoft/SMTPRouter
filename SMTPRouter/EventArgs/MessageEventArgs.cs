@@ -9,12 +9,12 @@ namespace SMTPRouter
     /// <summary>
     /// Event Arguments for the event when a <see cref="MimeMessage"/> is received
     /// </summary>
-    public class MessageReceivedEventArgs: EventArgs
+    public class MessageEventArgs: EventArgs
     {
         /// <summary>
         /// Initializes a new instance of the Message Received Event Arguments
         /// </summary>
-        public MessageReceivedEventArgs(): this(null)
+        public MessageEventArgs(): this(null)
         {
 
         }
@@ -23,7 +23,7 @@ namespace SMTPRouter
         /// Initializes a new instance of the Message Received Event Arguments
         /// </summary>
         /// <param name="mimeMessage">The <see cref="MimeMessage"/> received by the Smtp</param>
-        public MessageReceivedEventArgs(MimeMessage mimeMessage)
+        public MessageEventArgs(MimeMessage mimeMessage)
         {
             MimeMessage = mimeMessage;
         }

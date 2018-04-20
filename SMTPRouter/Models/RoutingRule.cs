@@ -50,8 +50,8 @@ namespace SMTPRouter.Models
         /// <summary>
         /// Validates the Rule
         /// </summary>
-        /// <param name="mimeMessage">Reference to the <see cref="RoutingMessage"/></param>
+        /// <param name="mimeMessage">Reference to the <see cref="MimeMessage"/></param>
         /// <returns>A <see cref="bool"/> to define whether the rule matches</returns>
-        public abstract bool Match(RoutingMessage mimeMessage);
+        public abstract bool Match(MimeMessage mimeMessage);
     }
 }
