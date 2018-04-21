@@ -75,7 +75,12 @@ namespace SMTPRouter
         /// </summary>
         /// <remarks>The Lifespan is the maximum time the message is still considered active. After the Lifespan expires, the message is sent to the Error Queue.</remarks>
         public TimeSpan MessageLifespan { get; set; }
-
+        
+        /// <summary>
+        /// The <see cref="TimeSpan"/> a message remains on queues. By default a message remains there for 90 days before being purged.
+        /// </summary>
+        public TimeSpan MessagePurgeLifespan { get; set; }
+        
         #endregion Router Properties
 
         #region Listener Events
@@ -189,6 +194,7 @@ namespace SMTPRouter
                 RoutingRules = this.RoutingRules,
                 DestinationSmtps = this.DestinationSmtps,
                 MessageLifespan = this.MessageLifespan,
+                MessagePurgeLifespan = this.MessagePurgeLifespan
             };
             this.Router.GeneralError += Router_GeneralError;
             this.Router.MessageNotRouted += Router_MessageNotRouted;

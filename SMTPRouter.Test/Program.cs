@@ -132,7 +132,7 @@ namespace SMTPRouter.Test
                             Password = "",
                         }
                     },
-                    { "jdemasters", new Models.SmtpConfiguration()
+                    { "hotmail", new Models.SmtpConfiguration()
                         {
                             Host = "smtp.live.com",
                             Description = "Hotmail SMTP",
@@ -173,10 +173,21 @@ namespace SMTPRouter.Test
         {
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine("**** ERROR ****: Message Not Routed!");
+            Console.WriteLine($"From....: {((MailboxAddress)e.MimeMessage.From[0]).Address.ToString()}");
+            Console.WriteLine($"To......: {String.Join(",", (from t in e.MimeMessage.To where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
             Console.WriteLine();
-            Console.WriteLine($"From: {((MailboxAddress)e.MimeMessage.From[0]).Address.ToString()}");
-            Console.WriteLine($"Error: {e.Exception.Message}");
-            Console.WriteLine($"Stack Trace: {e.Exception.StackTrace}");
+            Console.WriteLine("Exception:");
+            Console.WriteLine($"   Error..........: {e.Exception.Message}");
+            Console.WriteLine($"   Stack Trace....: {e.Exception.StackTrace}");
+
+            if (e.Exception.InnerException != null)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Inner Exception:");
+                Console.WriteLine($"   Error..........: {e.Exception.InnerException.Message}");
+                Console.WriteLine($"   Stack Trace....: {e.Exception.InnerException.StackTrace}");
+            }
+
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine();
         }
@@ -185,8 +196,8 @@ namespace SMTPRouter.Test
         {
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine("Message Routed Successfully!");
-            Console.WriteLine();
-            Console.WriteLine($"From: {((MailboxAddress)e.MimeMessage.From[0]).Address.ToString()}");
+            Console.WriteLine($"From....: {((MailboxAddress)e.MimeMessage.From[0]).Address.ToString()}");
+            Console.WriteLine($"To......: {String.Join(",", (from t in e.MimeMessage.To where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine();
         }
@@ -213,8 +224,8 @@ namespace SMTPRouter.Test
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine("A message was received!!");
             Console.WriteLine();
-            Console.WriteLine($"From: {((MailboxAddress)e.MimeMessage.From[0]).Address.ToString()}");
-            Console.WriteLine($"To: {String.Join(",", (from t in e.MimeMessage.To where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
+            Console.WriteLine($"From....: {((MailboxAddress)e.MimeMessage.From[0]).Address.ToString()}");
+            Console.WriteLine($"To......: {String.Join(",", (from t in e.MimeMessage.To where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
             Console.WriteLine();
             Console.WriteLine(e.MimeMessage.ToString());
             Console.WriteLine("--------------------------------------------------------------------------------");

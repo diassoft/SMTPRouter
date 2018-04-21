@@ -57,10 +57,15 @@ namespace SMTPRouter
         public WorkingFolders Folders { get; internal set; }
 
         /// <summary>
-        /// The <see cref="TimeSpan"/> a message is stil considered valid. By default, a message lasts 15 minutes after its creation time
+        /// The <see cref="TimeSpan"/> a message is stil considered valid to retry. By default, a message lasts 15 minutes after its creation time
         /// </summary>
         /// <remarks>The Lifespan is the maximum time the message is still considered active. After the Lifespan expires, the message is sent to the Error Queue.</remarks>
         public TimeSpan MessageLifespan { get; set; }
+
+        /// <summary>
+        /// The <see cref="TimeSpan"/> a message remains on the queues. By default a message remains there for 90 days before being purged.
+        /// </summary>
+        public TimeSpan MessagePurgeLifespan { get; set; }
 
         #endregion Properties
 
@@ -120,6 +125,7 @@ namespace SMTPRouter
 
             // Set Default Lifespan
             MessageLifespan = new TimeSpan(0, 15, 0);
+            MessagePurgeLifespan = new TimeSpan(90, 0, 0, 0, 0);
 
             // Set the folder structure
             Folders = new WorkingFolders(queuePath);
@@ -156,7 +162,8 @@ namespace SMTPRouter
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             await Task.WhenAll(Task.Run(() => ProcessOutgoingQueue(cancellationToken)),
-                               Task.Run(() => ProcessRetryQueue(cancellationToken))).ConfigureAwait(false);
+                               Task.Run(() => ProcessRetryQueue(cancellationToken)),
+                               Task.Run(() => PurgeQueues(cancellationToken))).ConfigureAwait(false);
         }
 
         #endregion Initialization Methods
@@ -376,6 +383,37 @@ namespace SMTPRouter
             catch (Exception e)
             {
                 throw new Exception("Unable to Enqueue message", e);
+            }
+        }
+
+        /// <summary>
+        /// Purges queues for messages older then the <see cref="MessagePurgeLifespan"/>
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token</param>
+        public void PurgeQueues(CancellationToken cancellationToken)
+        {
+            while (cancellationToken.IsCancellationRequested == false)
+            {
+                try
+                {
+                    // Get all files inside the Queue
+                    DirectoryInfo dirInfo = new DirectoryInfo(Folders.RootFolder);
+                    IEnumerable<FileInfo> files = dirInfo.EnumerateFiles("*.EML", SearchOption.AllDirectories);
+
+                    // Retrieve all files older than the MessagePurgeLifespan 
+                    foreach (FileInfo fi in (from f in files where f.CreationTime < DateTime.Now.Subtract(MessagePurgeLifespan) select f))
+                    {
+                        File.Delete(fi.FullName);
+                    }
+                }
+                catch (Exception e)
+                {
+                    // Call the GeneralError Event Handler
+                    GeneralError?.Invoke(this, new GeneralErrorEventArgs(e, nameof(PurgeQueues)));
+                }
+
+                // Wait for 10 minutes before trying it again
+                Task.Delay(new TimeSpan(0, 10, 0)).Wait();
             }
         }
 
