@@ -1,4 +1,4 @@
-# SMTP Router
+# Smtp Router
 [![nuget](https://img.shields.io/nuget/v/SmtpRouter.svg)](https://www.nuget.org/packages/SmtpRouter/) 
 ![GitHub release](https://img.shields.io/github/release/diassoft/SmtpRouter.svg)
 ![NuGet](https://img.shields.io/nuget/dt/SmtpRouter.svg)
@@ -10,11 +10,9 @@ It contains a `Listener` to capture Smtp messages and a `Router` that will route
 These are some of the uses of an SMTP Router:
 * Flexible SMTP Relay Server
 * Switch the destination SMTP server based on the incoming message. This is especially useful when you have systems that can only accept one single SMTP configuration and you want to use more than one SMTP.
-* Use Multiple SMTPs to send messages, due to daily our hourly limits defined by the email provider (<i>in development</i>)
+* Use Multiple SMTPs to send messages, due to daily our hourly limits defined by the email provider (*in development*)
 
-<b>Currently this is a Development version yet, so please do not use it until this message goes away!!</b>
-
-## How To Use it
+## How To Use It
 
 There are two different ways to use the SMTP Router. 
 
@@ -175,7 +173,7 @@ Task.WhenAll(listener.StartAsync(CancellationToken.None),
 
 ## Smtp Configuration
 
-The `Router` has a property named `DestinationSmtp`, which represents a `Dictionary<string, SmtpConfiguration>`. 
+The `Router` has a property named `DestinationSmtps`, which represents a `Dictionary<string, SmtpConfiguration>`. 
 
 The Smtps to route messages must be cofigured and added to this collection. The `Key` field is the key to fetch the Smtp.
 

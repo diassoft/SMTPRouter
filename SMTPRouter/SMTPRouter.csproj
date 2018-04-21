@@ -2,6 +2,21 @@
 
   <PropertyGroup>
     <TargetFrameworks>netstandard1.3;net451;net46;net461</TargetFrameworks>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Authors>Olavo Henrique Dias</Authors>
+    <Company>http://www.diassoft.com</Company>
+    <Product>SMTPRouter</Product>
+    <Description>Provides a Component to implement a SMTP Router. 
+A SMTP Router is an object that will receive SMTP messages and forward it to another SMTP, based on certain routing rules.</Description>
+    <Copyright>© 2018 Diassoft Corporation</Copyright>
+    <Version>1.0.0.1</Version>
+    <AssemblyVersion>1.0.01.1</AssemblyVersion>
+    <PackageProjectUrl>https://github.com/diassoft/SMTPRouter/releases/tag/v1.0.0.1</PackageProjectUrl>
+    <PackageIconUrl>https://github.com/diassoft/Branding/blob/master/Nuget-Package-Icon-v01.png?raw=true</PackageIconUrl>
+    <RepositoryUrl>https://github.com/diassoft/SMTPRouter</RepositoryUrl>
+    <RepositoryType>Public</RepositoryType>
+    <PackageTags>Diassoft SMTP Router Server SmtpRouter Listen Messages Listener</PackageTags>
+    <PackageReleaseNotes>This release contains a Listener object to Listen to SMTP Messages, a Router object to check a message queue and send messages to the proper SMTP, and a Server object that encapsulate both the Listener and Router together.</PackageReleaseNotes>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
