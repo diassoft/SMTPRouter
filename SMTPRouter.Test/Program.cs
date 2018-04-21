@@ -1,5 +1,6 @@
 ﻿using MailKit.Net.Smtp;
 using MimeKit;
+using SMTPRouter.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
