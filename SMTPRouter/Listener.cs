@@ -11,6 +11,26 @@ namespace SMTPRouter
     /// A class representing an SMTP Listener
     /// </summary>
     /// <remarks>The Listener will listen to Smtp Commands and fire events when messages are received</remarks>
+    /// <example>
+    /// A <see cref="Listener"/> can be created using the code below:
+    /// <code>
+    /// // Create the Listener
+    /// var listener = new SMTPRouter.Listener()
+    /// {
+    ///     ServerName = "localhost",
+    ///     Ports = new int[] { 25, 587 },
+    ///     RequiresAuthentication = false,
+    ///     UseSSL = false
+    /// };
+    /// 
+    /// // Hook into events
+    /// listener.ListeningStarted += Server_ListeningStarted;
+    /// listener.SessionCreated += Server_SessionCreated;
+    /// listener.SessionCommandExecuting += Server_SessionCommandExecuting;
+    /// listener.SessionCompleted += Server_SessionCompleted;
+    /// listener.MessageReceived += Server_MessageReceived;
+    /// </code>
+    /// </example>
     public sealed class Listener
     {
         #region Properties

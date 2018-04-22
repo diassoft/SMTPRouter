@@ -68,10 +68,6 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\SMTPRouter.Windows\SMTPRouter.Windows.csproj">
-      <Project>{deba52a4-e1b4-4aea-bdae-43fce0e427ff}</Project>
-      <Name>SMTPRouter.Windows</Name>
-    </ProjectReference>
     <ProjectReference Include="..\SMTPRouter\SMTPRouter.csproj">
       <Project>{cf8a35b5-a9cb-4582-ba0c-84c34c34e68c}</Project>
       <Name>SMTPRouter</Name>

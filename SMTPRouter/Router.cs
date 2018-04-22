@@ -16,6 +16,46 @@ namespace SMTPRouter
     /// A class representing a Message Router.
     /// </summary>
     /// <remarks>The router receives the message and then routes it</remarks>
+    /// <example>
+    /// A <see cref="Router"/> can be created using the code below:
+    /// <code>
+    /// // Create the Router
+    /// var router = new SMTPRouter.Router("SMTPRouter", "C:\\SMTPRouter\\Queues")
+    /// {
+    ///     MessageLifespan = new TimeSpan(0, 15, 0),
+    ///     RoutingRules = new List<![CDATA[<Models.RoutingRule>]]>()
+    ///     {
+    ///         new Models.MailFromDomainRoutingRule(10, "gmail.com", "gmail"),
+    ///         new Models.MailFromDomainRoutingRule(20, "hotmail.com", "hotmail")
+    ///     },
+    ///     DestinationSmtps = new Dictionary<![CDATA[<string, Models.SmtpConfiguration>]]>
+    ///     {
+    ///         { "gmail", new Models.SmtpConfiguration()
+    ///             {
+    ///                 Host = "smtp.gmail.com",
+    ///                 Description = "Google Mail SMTP",
+    ///                 Port = 587,
+    ///                 RequiresAuthentication = true,
+    ///                 User = "user@gmail.com",
+    ///                 Password = "",
+    ///             }
+    ///         },
+    ///         { "hotmail", new Models.SmtpConfiguration()
+    ///             {
+    ///                 Host = "smtp.live.com",
+    ///                 Description = "Hotmail SMTP",
+    ///                 Port = 587,
+    ///                 RequiresAuthentication = true,
+    ///                 User = "user@hotmail.com",
+    ///                 Password = "",
+    ///             }
+    ///         }
+    ///     },
+    /// };
+    /// router.MessageRoutedSuccessfully += Server_MessageRoutedSuccessfully;
+    /// router.MessageNotRouted += Server_MessageNotRouted;
+    /// </code>
+    /// </example>
     public sealed class Router
     {
 

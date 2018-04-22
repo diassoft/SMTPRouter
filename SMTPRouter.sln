@@ -12,10 +12,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SMTPRouter.Test", "SMTPRouter.Test\SMTPRouter.Test.csproj", "{3EB4DF2F-5E0C-4013-BBFD-097BA82AF2FE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SMTPRouter.Windows.ServiceHost", "SMTPRouter.Windows.ServiceHost\SMTPRouter.Windows.ServiceHost.csproj", "{2AEE3824-A538-434B-ACA3-AA01891B051B}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SMTPRouter.Windows", "SMTPRouter.Windows\SMTPRouter.Windows.csproj", "{DEBA52A4-E1B4-4AEA-BDAE-43FCE0E427FF}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,14 +26,6 @@ Global
 		{3EB4DF2F-5E0C-4013-BBFD-097BA82AF2FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3EB4DF2F-5E0C-4013-BBFD-097BA82AF2FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3EB4DF2F-5E0C-4013-BBFD-097BA82AF2FE}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2AEE3824-A538-434B-ACA3-AA01891B051B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2AEE3824-A538-434B-ACA3-AA01891B051B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2AEE3824-A538-434B-ACA3-AA01891B051B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2AEE3824-A538-434B-ACA3-AA01891B051B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{DEBA52A4-E1B4-4AEA-BDAE-43FCE0E427FF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{DEBA52A4-E1B4-4AEA-BDAE-43FCE0E427FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{DEBA52A4-E1B4-4AEA-BDAE-43FCE0E427FF}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{DEBA52A4-E1B4-4AEA-BDAE-43FCE0E427FF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
