@@ -4,16 +4,15 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{3EB4DF2F-5E0C-4013-BBFD-097BA82AF2FE}</ProjectGuid>
-    <OutputType>Exe</OutputType>
-    <RootNamespace>SMTPRouter.Test</RootNamespace>
-    <AssemblyName>SMTPRouter.Test</AssemblyName>
+    <ProjectGuid>{DEBA52A4-E1B4-4AEA-BDAE-43FCE0E427FF}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>SMTPRouter.Windows</RootNamespace>
+    <AssemblyName>SMTPRouter.Windows</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
@@ -21,15 +20,16 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <DocumentationFile>bin\Debug\SMTPRouter.Windows.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <DocumentationFile>bin\Release\SMTPRouter.Windows.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="BouncyCastle.Crypto, Version=1.8.1.0, Culture=neutral, PublicKeyToken=0e99375e54769942">
@@ -45,6 +45,9 @@
       <HintPath>..\packages\MimeKit.2.0.3\lib\net45\MimeKit.dll</HintPath>
     </Reference>
     <Reference Include="PresentationCore" />
+    <Reference Include="SMTPRouter, Version=1.0.1.1, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\SMTPRouter.1.0.0.1\lib\net461\SMTPRouter.dll</HintPath>
+    </Reference>
     <Reference Include="SmtpServer, Version=5.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\SmtpServer.5.0.0\lib\net45\SmtpServer.dll</HintPath>
     </Reference>
@@ -60,22 +63,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Program.cs" />
+    <Compile Include="Configuration\ConfigFileParser.cs" />
+    <Compile Include="Configuration\NameValueSection.cs" />
+    <Compile Include="Configuration\RoutingRuleCollection.cs" />
+    <Compile Include="Configuration\RoutingRulesSection.cs" />
+    <Compile Include="Configuration\RoutingRuleElement.cs" />
+    <Compile Include="Configuration\SmtpConnectionCollection.cs" />
+    <Compile Include="Configuration\SmtpConnectionElement.cs" />
+    <Compile Include="Configuration\SmtpConnectionsSection.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="App.config" />
     <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\SMTPRouter.Windows\SMTPRouter.Windows.csproj">
-      <Project>{deba52a4-e1b4-4aea-bdae-43fce0e427ff}</Project>
-      <Name>SMTPRouter.Windows</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\SMTPRouter\SMTPRouter.csproj">
-      <Project>{cf8a35b5-a9cb-4582-ba0c-84c34c34e68c}</Project>
-      <Name>SMTPRouter</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
