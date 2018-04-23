@@ -17,6 +17,7 @@ A SMTP Router is an object that will receive SMTP messages and forward it to ano
     <RepositoryType>Public</RepositoryType>
     <PackageTags>Diassoft SMTP Router Server SmtpRouter Listen Messages Listener Relay SMTPRelay</PackageTags>
     <PackageReleaseNotes>This release contains a Listener object to Listen to SMTP Messages, a Router object to check a message queue and send messages to the proper SMTP, and a Server object that encapsulate both the Listener and Router together.</PackageReleaseNotes>
+    <PackageLicenseUrl>https://raw.githubusercontent.com/diassoft/SMTPRouter/master/LICENSE.MD</PackageLicenseUrl>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
