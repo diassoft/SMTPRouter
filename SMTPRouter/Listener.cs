@@ -39,12 +39,10 @@ namespace SMTPRouter
         /// Reference to the SmtpServer
         /// </summary>
         public SmtpServer.SmtpServer Server { get; private set; }
-
         /// <summary>
         /// Defines whether the Listener is active or not
         /// </summary>
         public bool IsListening { get; private set; }
-
         /// <summary>
         /// Name of the Server where the services will run
         /// </summary>

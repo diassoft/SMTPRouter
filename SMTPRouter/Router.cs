@@ -404,6 +404,7 @@ namespace SMTPRouter
         /// Adds a message to the proper queue
         /// </summary>
         /// <param name="message"></param>
+        /// <exception cref="MessageNotQueuedException">Throw when a message could not be added to the queue</exception>
         public void Enqueue(MimeMessage message)
         {
             // Defines the file name
@@ -422,7 +423,7 @@ namespace SMTPRouter
             }
             catch (Exception e)
             {
-                throw new Exception("Unable to Enqueue message", e);
+                throw new MessageNotQueuedException(message, e);
             }
         }
 
