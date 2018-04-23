@@ -2,8 +2,12 @@
 using MimeKit;
 using SMTPRouter.Models;
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.Configuration;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,7 +20,7 @@ namespace SMTPRouter.Test
         {
             // Decide what to test
             Console.WriteLine("===================================================================================");
-            Console.WriteLine("Test SMTPRouter");
+            Console.WriteLine("Test SMTPRouter (.NET Framework Version)");
             Console.WriteLine("===================================================================================");
             Console.WriteLine();
             Console.WriteLine("1 - Test Using a Server Component");
@@ -167,6 +171,7 @@ namespace SMTPRouter.Test
             SendEmail("user@gmail.com", "user@gmail.com", 10);
             SendEmail("user@hotmail.com", "user@hotmail.com", 22);
         }
+
 
         #region Event Handlers
 

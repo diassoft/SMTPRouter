@@ -13,7 +13,7 @@ namespace SMTPRouter.Models
         private string _Key;
 
         /// <summary>
-        /// The Key of the SMTP Configuration
+        /// A unique name to identify the SMTP Configuration
         /// </summary>
         public string Key
         {

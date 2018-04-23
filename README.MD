@@ -1,16 +1,41 @@
-# Smtp Router
+# Smtp Router - v1.0.0.2
 [![nuget](https://img.shields.io/nuget/v/SmtpRouter.svg)](https://www.nuget.org/packages/SmtpRouter/) 
 ![GitHub release](https://img.shields.io/github/release/diassoft/SmtpRouter.svg)
 ![NuGet](https://img.shields.io/nuget/dt/SmtpRouter.svg)
+![license](https://img.shields.io/github/license/diassoft/SMTPRouter.svg)
+
 
 The SMTP Router is a intermediate SMTP server useful to intercept messages and route it to another smtp.
 
 It contains a `Listener` to capture Smtp messages and a `Router` that will route the message to another Smtp Server when it matches certain `RoutingRules`.
 
 These are some of the uses of an SMTP Router:
-* Flexible SMTP Relay Server
+* SMTP Relay Server
 * Switch the destination SMTP server based on the incoming message. This is especially useful when you have systems that can only accept one single SMTP configuration and you want to use more than one SMTP.
 * Use Multiple SMTPs to send messages, due to daily our hourly limits defined by the email provider (*in development*)
+
+>If you wish to contact the creator of this component, you can make it thru the [Nuget.org](https://www.nuget.org/packages/SmtpRouter/) page or by email [olavodias@gmail.com](mailto:olavodias@gmail.com).
+
+## In this repository
+
+* [SMTP Router Documentation](https://diassoft.github.io/SMTPRouter)
+* [How To Use It](#how-to-use-it)
+    * [Prerequisites](#prerequisites)
+    * [Using the Server object](#using-the-server-object)
+    * [Using the Listener and Router individually](#using-the-listener-and-router-individually)
+    * [Using the Server object](#using-the-server-object)
+* [Smtp Configuration](#smtp-configuration)
+* [Routing Rules](#routing-rules)
+
+## Additional Repositories
+
+There are other interesting repositories regarding the SMTPRouter Project.
+
+| Repository | Description | Nuget |
+| :-- | :-- | --- |
+| [SMTPRouter.Windows](https://github.com/diassoft/SMTPRouter.Windows) | Contains types to allow the use of the SMTPRouter Component in a .NET Framework. It also contains an implementation of the SMTPRouter as a Windows Service | [![nuget](https://img.shields.io/nuget/v/SmtpRouter.Windows.svg)](https://www.nuget.org/packages/SmtpRouter.Windows/)  |
+
+*We are currently working on a solution to have it run in other OSs*
 
 ## How To Use It
 
@@ -100,6 +125,8 @@ server.MessageRoutedSuccessfully += Server_MessageRoutedSuccessfully;
 server.MessageNotRouted += Server_MessageNotRouted;
 ```
 
+For more information, refer to the [Server Class](https://diassoft.github.io/SMTPRouter/html/T_SMTPRouter_Server.htm) in the documentation.
+
 ### Using the Listener and Router Individually
 
 It is not necessary to instantiate the `Listener` and `Router` manually, but if you need to have more control, you can do it.
@@ -171,6 +198,8 @@ Task.WhenAll(listener.StartAsync(CancellationToken.None),
              router.StartAsync(CancellationToken.None)).ConfigureAwait(false);
 ```
 
+For more information, refer to the [Listener Class](https://diassoft.github.io/SMTPRouter/html/T_SMTPRouter_Listener.htm) and the [Router Class](https://diassoft.github.io/SMTPRouter/html/T_SMTPRouter_Router.htm]) in the documentation.
+
 ## Smtp Configuration
 
 The `Router` has a property named `DestinationSmtps`, which represents a `Dictionary<string, SmtpConfiguration>`. 
@@ -194,6 +223,10 @@ var smtpConfiguration = new SmtpConfiguration()
 };
 ```
 
+The `SmtpConfiguration` object derives from an `ObservableObject`, which makes it compatible with **Mvvm Implementations**.
+
+For more information, refer to the [SmtpConfiguration](https://diassoft.github.io/SMTPRouter/html/T_SMTPRouter_Models_SmtpConfiguration.htm) in the documentation.
+
 ## Routing Rules
 
 The `Router` has a property named `RoutingRules`, which represents a `List<RoutingRule>`.
@@ -202,7 +235,9 @@ A `RoutingRule` is a Rule that can be applied and, if it matches, the Smtp Confi
 
 The `RoutingRule` class itself does not provide any rule, instead, it is a `base class` that must be inherited from in order to create an actual rule. 
 
-By default the SmtpRouter offers the `MailFromDomainRoutingRule`, which is a rule that verifies if the **domain** on the **mail from** matches the domain configured on the rule. Other `RoutingRules` are to be developed.
+By default the SmtpRouter offers two Routing Rules:
+* `MailFromDomainRoutingRule`, which is a rule that verifies if the **domain** on the **mail from** matches the domain configured on the rule. 
+* `MailFromRegexMatchRoutingRule`, which is a rule that runs a `System.Text.RegularExpressions` to validate the **mail from**.
 
 The code below demonstrates how to add a `MailFromDomainRoutingRule` to the `Router` object: 
 ```cs
@@ -232,3 +267,7 @@ public sealed class MyCustomRoutingRule: RoutingRule
 ```
 
 You have to override the method `Match` to provide a algorithm that validades the rule.
+
+The `RoutingRule` object derives from an `ObservableObject`, which makes it compatible with **Mvvm Implementations**.
+
+For more information, refer to the [RoutingRule](https://diassoft.github.io/SMTPRouter/html/T_SMTPRouter_Models_RoutingRule.htm) in the documentation.
