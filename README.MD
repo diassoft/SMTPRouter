@@ -1,9 +1,8 @@
-# Smtp Router - v1.0.0.2
+# Smtp Router - v1.0.0.3
 [![nuget](https://img.shields.io/nuget/v/SmtpRouter.svg)](https://www.nuget.org/packages/SmtpRouter/) 
 ![GitHub release](https://img.shields.io/github/release/diassoft/SmtpRouter.svg)
 ![NuGet](https://img.shields.io/nuget/dt/SmtpRouter.svg)
 ![license](https://img.shields.io/github/license/diassoft/SMTPRouter.svg)
-
 
 The SMTP Router is a intermediate SMTP server useful to intercept messages and route it to another smtp.
 
@@ -219,11 +218,24 @@ var smtpConfiguration = new SmtpConfiguration()
     RequiresAuthentication = true,
     UseSSL = false,
     User = "user@gmail.com",
-    Password = "password"
+    Password = "password",
+    SecureSocketOption = 1
 };
 ```
 
 The `SmtpConfiguration` object derives from an `ObservableObject`, which makes it compatible with **Mvvm Implementations**.
+
+Valid values for the `SecureSocketOption` are:
+
+| Value | Description | Usage |
+| :--- | :--- | :--- |
+| `0` | `None` | No SSL or TLS encryption should be used |
+| `1` | `Auto` | The system will decide whether to use SSL or TLS |
+| `2` | `SslOnConnect` | The connection should use SSL or TLS encryption immediately |
+| `3` | `StartTls` | Elevates the connection to use TLS encryption immediatelly after reading the greeting a server capabilities |
+| `4` | `StartTlsWhenAvailable` | Elevates the connection to use TLS encryption immediatelly after reading the greeting a server capabilities, but only if the server supports that |
+
+When you set the `UseSSL` property to `true`, the system changes the port to `465` and the `SecureSocketOption` to `SslOnConnect`.
 
 For more information, refer to the [SmtpConfiguration](https://diassoft.github.io/SMTPRouter/html/T_SMTPRouter_Models_SmtpConfiguration.htm) in the documentation.
 
