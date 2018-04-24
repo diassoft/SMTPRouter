@@ -441,10 +441,21 @@ namespace SMTPRouter
                     DirectoryInfo dirInfo = new DirectoryInfo(Folders.RootFolder);
                     IEnumerable<FileInfo> files = dirInfo.EnumerateFiles("*.EML", SearchOption.AllDirectories);
 
-                    // Retrieve all files older than the MessagePurgeLifespan 
-                    foreach (FileInfo fi in (from f in files where f.CreationTime < DateTime.Now.Subtract(MessagePurgeLifespan) select f))
+                    // Date to Purge
+                    DateTime purgeDate = DateTime.Now.Subtract(MessagePurgeLifespan);
+
+                    // Retrieve all files on the queues
+                    foreach (FileInfo fi in files)
                     {
-                        File.Delete(fi.FullName);
+                        // Refresh the FileInfo to get the proper CreationTime
+                        fi.Refresh();
+
+                        // Check Date
+                        if (fi.CreationTime.CompareTo(purgeDate) < 0)
+                        {
+                            // Delete the file
+                            File.Delete(fi.FullName);
+                        }
                     }
                 }
                 catch (Exception e)
