@@ -111,7 +111,7 @@ namespace SMTPRouter.Models
         ///     <item>Auto = 1 (The system will decide whether to use SSL or TLS)</item>
         ///     <item>SslOnConnect = 2 (The connection should use SSL or TLS encryption immediately)</item>
         ///     <item>StartTls = 3 (Elevates the connection to use TLS encryption immediately after reading the greeting and server capabilities)</item>
-        ///     <item>StartTlsWhenAvailable = 3 (Elevates the connection to use TLS encryption immediately after reading the greeting and server capabilities, but only if the server supports that)</item>
+        ///     <item>StartTlsWhenAvailable = 4 (Elevates the connection to use TLS encryption immediately after reading the greeting and server capabilities, but only if the server supports that)</item>
         /// </list>
         /// </remarks>
         public int SecureSocketOption
