@@ -274,7 +274,7 @@ namespace SMTPRouter
                 }
 
                 // Wait 10 seconds before trying again
-                Task.Delay(10000).Wait();
+                Task.Delay(10000).Wait(cancellationToken);
             }
         }
 
@@ -336,13 +336,19 @@ namespace SMTPRouter
                 if (smtpConfiguration == null)
                     throw new ArgumentNullException($"The Smtp by the key '{selectedRule.SmtpConfigurationKey}' is misconfigured");
 
+                // Checks SSL
+                if (smtpConfiguration.UseSSL)
+                {
+                    smtpConfiguration.Port = 465;
+                    smtpConfiguration.SecureSocketOption = 2;
+                }
+
                 // Connect to the SMTP
                 SmtpClient client = new SmtpClient();
 
                 client.Connect(smtpConfiguration.Host,
                                smtpConfiguration.Port,
-                               smtpConfiguration.UseSSL ? MailKit.Security.SecureSocketOptions.SslOnConnect :
-                                                          MailKit.Security.SecureSocketOptions.Auto);
+                               (MailKit.Security.SecureSocketOptions)smtpConfiguration.SecureSocketOption);
 
                 if (smtpConfiguration.RequiresAuthentication)
                 {
@@ -395,8 +401,8 @@ namespace SMTPRouter
                     }
                 }
 
-                // Wait 2 minutes before trying again
-                Task.Delay(120000).Wait();
+                // Wait 1 minutes before trying again
+                Task.Delay(60000).Wait(cancellationToken);
             }
         }
 
@@ -465,7 +471,7 @@ namespace SMTPRouter
                 }
 
                 // Wait for 10 minutes before trying it again
-                Task.Delay(new TimeSpan(0, 10, 0)).Wait();
+                Task.Delay(new TimeSpan(0, 10, 0)).Wait(cancellationToken);
             }
         }
 
