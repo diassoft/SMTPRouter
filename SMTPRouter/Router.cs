@@ -122,6 +122,17 @@ namespace SMTPRouter
         public event EventHandler<MessageErrorEventArgs> MessageNotRouted;
 
         /// <summary>
+        /// Event triggered when a message is about to be purged by the system.
+        /// </summary>
+        /// <remarks>You can prevent the purge by changing the <see cref="PurgeFileEventArgs.Cancel"/> property to true</remarks>
+        public event EventHandler<PurgeFileEventArgs> MessagePurging;
+
+        /// <summary>
+        /// Event triggered after messages are purged
+        /// </summary>
+        public event EventHandler<PurgeFilesEventArgs> MessagesPurged;
+
+        /// <summary>
         /// Event triggered when a general error happens on the processing
         /// </summary>
         /// <remarks>Usually general errors stop the processing so it's important to handle this event</remarks>
@@ -441,37 +452,70 @@ namespace SMTPRouter
         {
             while (cancellationToken.IsCancellationRequested == false)
             {
-                try
+                // Ensure the service is not paused
+                if (!IsPaused)
                 {
-                    // Get all files inside the Queue
-                    DirectoryInfo dirInfo = new DirectoryInfo(Folders.RootFolder);
-                    IEnumerable<FileInfo> files = dirInfo.EnumerateFiles("*.EML", SearchOption.AllDirectories);
-
-                    // Date to Purge
-                    DateTime purgeDate = DateTime.Now.Subtract(MessagePurgeLifespan);
-
-                    // Retrieve all files on the queues
-                    foreach (FileInfo fi in files)
+                    try
                     {
-                        // Refresh the FileInfo to get the proper CreationTime
-                        fi.Refresh();
+                        // Get all files inside the Queue
+                        DirectoryInfo dirInfo = new DirectoryInfo(Folders.RootFolder);
+                        IEnumerable<FileInfo> files = dirInfo.EnumerateFiles("*.EML", SearchOption.AllDirectories);
 
-                        // Check Date
-                        if (fi.CreationTime.CompareTo(purgeDate) < 0)
+                        // Purged Files Collection
+                        List<FileInfo> purgedFiles = new List<FileInfo>();
+
+                        // Date to Purge
+                        DateTime purgeDate = DateTime.Now.Subtract(MessagePurgeLifespan);
+
+                        // Retrieve all files on the queues
+                        foreach (FileInfo fi in files)
                         {
-                            // Delete the file
-                            File.Delete(fi.FullName);
-                        }
-                    }
-                }
-                catch (Exception e)
-                {
-                    // Call the GeneralError Event Handler
-                    GeneralError?.Invoke(this, new GeneralErrorEventArgs(e, nameof(PurgeQueues)));
-                }
+                            // Refresh the FileInfo to get the proper CreationTime
+                            fi.Refresh();
 
-                // Wait for 10 minutes before trying it again
-                Task.Delay(new TimeSpan(0, 10, 0)).Wait(cancellationToken);
+                            // Check Date
+                            if (fi.CreationTime.CompareTo(purgeDate) < 0)
+                            {
+                                // Calls the Purge Event
+                                PurgeFileEventArgs purgeFileEventArgs = new PurgeFileEventArgs(fi, purgeDate);
+                                bool cancelPurge = false;
+
+                                if (MessagePurging != null)
+                                {
+                                    MessagePurging.Invoke(this, purgeFileEventArgs);
+                                    cancelPurge = purgeFileEventArgs.Cancel;
+                                }
+                                
+                                // Purge or Keep File
+                                if (!cancelPurge)
+                                {
+                                    // Delete the file
+                                    File.Delete(fi.FullName);
+
+                                    // Add it to collection (since the refresh method was called before, the information does not get lost)
+                                    purgedFiles.Add(fi);
+                                }
+                            }
+                        }
+
+                        // Trigger event if handled
+                        if (purgedFiles.Count > 0)
+                            MessagesPurged?.Invoke(this, new PurgeFilesEventArgs(purgedFiles, purgeDate));
+                    }
+                    catch (Exception e)
+                    {
+                        // Call the GeneralError Event Handler
+                        GeneralError?.Invoke(this, new GeneralErrorEventArgs(e, nameof(PurgeQueues)));
+                    }
+
+                    // Wait for 10 minutes before trying it again (cancellationToken forces it to exit too)
+                    Task.Delay(new TimeSpan(0, 10, 0)).Wait(cancellationToken);
+                }
+                else
+                {
+                    // Wait for 10 seconds trying it again (cancellationToken forces it to exit too)
+                    Task.Delay(10000).Wait(cancellationToken);
+                }
             }
         }
 

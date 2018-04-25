@@ -1,4 +1,4 @@
-# Smtp Router - v1.0.0.3
+# Smtp Router - v1.0.0.4
 [![nuget](https://img.shields.io/nuget/v/SmtpRouter.svg)](https://www.nuget.org/packages/SmtpRouter/) 
 ![GitHub release](https://img.shields.io/github/release/diassoft/SmtpRouter.svg)
 ![NuGet](https://img.shields.io/nuget/dt/SmtpRouter.svg)
@@ -30,9 +30,9 @@ These are some of the uses of an SMTP Router:
 
 There are other interesting repositories regarding the SMTPRouter Project.
 
-| Repository | Description | Nuget |
-| :-- | :-- | --- |
-| [SMTPRouter.Windows](https://github.com/diassoft/SMTPRouter.Windows) | Contains types to allow the use of the SMTPRouter Component in a .NET Framework. It also contains an implementation of the SMTPRouter as a Windows Service | [![nuget](https://img.shields.io/nuget/v/SmtpRouter.Windows.svg)](https://www.nuget.org/packages/SmtpRouter.Windows/)  |
+| Repository | Description | 
+| :-- | :-- | 
+| [SMTPRouter.Windows](https://github.com/diassoft/SMTPRouter.Windows) | Contains types to allow the use of the SMTPRouter Component in a .NET Framework. It also contains an implementation of the SMTPRouter as a Windows Service |
 
 *We are currently working on a solution to have it run in other OSs*
 
@@ -56,7 +56,6 @@ The `Router` creates a folder structure containing the following queues:
 | *Retry* | Emails that were not sent yet, but are still under the `MessageLifespan`. Those messages are sent back to the *Outgoing* queue.|
 | *Error* | Emails that were not sent and the `MessageLifespan` is expired. Those messages are no longer sent unless they are moved manually to the *Outgoing* queue.|
 
-
 ### Prerequisites
 
 When you choose to use the SmtpRouter Nuget Package, you will also be required to install the following packages:
@@ -78,6 +77,7 @@ The code below demonstrates how to instantiate a server:
 var server = new SMTPRouter.Server("localhost", 25, false, false, "SMTPRouter", "C:\\SMTPRouter\\Queues")
 {
     MessageLifespan = new TimeSpan(0, 15, 0),
+    MessagePurgeLifespan = new TimeSpan(90, 0, 0, 0),
     RoutingRules = new List<Models.RoutingRule>()
     {
         new Models.MailFromDomainRoutingRule(10, "gmail.com", "gmail"),
@@ -122,6 +122,8 @@ server.ListeningStarted += Server_ListeningStarted;
 server.MessageReceived += Server_MessageReceived;
 server.MessageRoutedSuccessfully += Server_MessageRoutedSuccessfully;
 server.MessageNotRouted += Server_MessageNotRouted;
+server.MessagePurging += Server_MessagePurging;
+server.MessagesPurged += Server_MessagesPurged;
 ```
 
 For more information, refer to the [Server Class](https://diassoft.github.io/SMTPRouter/html/T_SMTPRouter_Server.htm) in the documentation.
@@ -247,9 +249,13 @@ A `RoutingRule` is a Rule that can be applied and, if it matches, the Smtp Confi
 
 The `RoutingRule` class itself does not provide any rule, instead, it is a `base class` that must be inherited from in order to create an actual rule. 
 
-By default the SmtpRouter offers two Routing Rules:
-* `MailFromDomainRoutingRule`, which is a rule that verifies if the **domain** on the **mail from** matches the domain configured on the rule. 
-* `MailFromRegexMatchRoutingRule`, which is a rule that runs a `System.Text.RegularExpressions` to validate the **mail from**.
+By default the SmtpRouter offers the following Routing Rules:
+
+| Routing Rule | Description |
+| :--- | :--- |
+| `MailFromDomainRoutingRule` | A rule that verifies if the **domain** on the **mail from** matches the domain configured on the rule. |
+| `MailFromRegexMatchRoutingRule` | A a rule that runs a `System.Text.RegularExpressions` to validate the **mail from**. |
+| `AutoRelayRoutingRule` | A a rule always returns **true**. Use it when you need an **SMTP Relay** that routes messages just one single server |
 
 The code below demonstrates how to add a `MailFromDomainRoutingRule` to the `Router` object: 
 ```cs
