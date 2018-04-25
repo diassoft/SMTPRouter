@@ -255,7 +255,7 @@ By default the SmtpRouter offers the following Routing Rules:
 | :--- | :--- |
 | `MailFromDomainRoutingRule` | A rule that verifies if the **domain** on the **mail from** matches the domain configured on the rule. |
 | `MailFromRegexMatchRoutingRule` | A a rule that runs a `System.Text.RegularExpressions` to validate the **mail from**. |
-| `AutoRelayRoutingRule` | A a rule always returns **true**. Use it when you need an **SMTP Relay** that routes messages just one single server |
+| `RelayRoutingRule` | A a rule always returns **true**. Use it when you need an **SMTP Relay** that routes messages just one single server |
 
 The code below demonstrates how to add a `MailFromDomainRoutingRule` to the `Router` object: 
 ```cs
