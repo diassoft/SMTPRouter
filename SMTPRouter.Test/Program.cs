@@ -89,6 +89,8 @@ namespace SMTPRouter.Test
             server.MessageReceived += Server_MessageReceived;
             server.MessageRoutedSuccessfully += Server_MessageRoutedSuccessfully;
             server.MessageNotRouted += Server_MessageNotRouted;
+            server.MessagePurging += Server_MessagePurging;
+            server.MessagesPurged += Server_MessagesPurged;
 
             // Initialize Services
             Task.WhenAll(server.StartAsync(CancellationToken.None)).ConfigureAwait(false);
@@ -174,6 +176,27 @@ namespace SMTPRouter.Test
 
 
         #region Event Handlers
+
+        private static void Server_MessagesPurged(object sender, PurgeFilesEventArgs e)
+        {
+            // Files Purged
+            Console.ForegroundColor = ConsoleColor.Red;
+            foreach (var fi in e.Files)
+            {
+                Console.WriteLine($"Purged.... {fi.CreationTime.ToString("yyyy-MM-dd HH:mm:ss")} ... {fi.FullName}");
+            }
+            Console.ResetColor();
+        }
+
+        private static void Server_MessagePurging(object sender, PurgeFileEventArgs e)
+        {
+            // Informs Client
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            Console.WriteLine($"Purging file: {e.File.FullName}");
+            Console.WriteLine($"   CreationTime.....: {e.File.CreationTime.ToString("yyyy-MM-dd HH:mm:ss")}");
+            Console.WriteLine($"   PurgeDate........: {e.PurgeDate.ToString("yyyy-MM-dd HH:mm:ss")}");
+            Console.ResetColor();
+        }
 
         private static void Server_MessageNotRouted(object sender, MessageErrorEventArgs e)
         {

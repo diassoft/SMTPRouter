@@ -64,6 +64,27 @@ namespace SMTPRouter
     /// </example>
     public sealed class Server
     {
+        #region Server Properties
+
+        private bool _isPaused;
+        /// <summary>
+        /// Defines whether the routing process is Paused or Running
+        /// </summary>
+        /// <remarks>This property triggers the property <see cref="Router.IsPaused"/> if the <see cref="Router"/> is initialized</remarks>
+        public bool IsPaused
+        {
+            get { return _isPaused; }
+            set
+            {
+                _isPaused = value;
+
+                if (this.Router != null)
+                    this.Router.IsPaused = _isPaused;
+            }
+        }
+
+        #endregion Server Properties
+
         #region Listener Properties
 
         /// <summary>
@@ -173,6 +194,17 @@ namespace SMTPRouter
         public event EventHandler<MessageErrorEventArgs> MessageNotRouted;
 
         /// <summary>
+        /// Event triggered when a message is about to be purged by the system.
+        /// </summary>
+        /// <remarks>You can prevent the purge by changing the <see cref="PurgeFileEventArgs.Cancel"/> property to true</remarks>
+        public event EventHandler<PurgeFileEventArgs> MessagePurging;
+
+        /// <summary>
+        /// Event triggered after messages are purged
+        /// </summary>
+        public event EventHandler<PurgeFilesEventArgs> MessagesPurged;
+
+        /// <summary>
         /// Event triggered when a general error happens on the processing
         /// </summary>
         /// <remarks>Usually general errors stop the processing so it's important to handle this event</remarks>
@@ -215,6 +247,9 @@ namespace SMTPRouter
             UseSSL = useSSL;
             QueueName = queueName;
             QueuePath = queuePath;
+            IsPaused = false;
+            MessageLifespan = new TimeSpan(0, 15, 0);
+            MessagePurgeLifespan = new TimeSpan(90, 0, 0, 0);
         }
 
         #endregion Constructors
@@ -249,6 +284,9 @@ namespace SMTPRouter
             this.Router.GeneralError += Router_GeneralError;
             this.Router.MessageNotRouted += Router_MessageNotRouted;
             this.Router.MessageRoutedSuccessfully += Router_MessageRoutedSuccessfully;
+            this.Router.MessagePurging += Router_MessagePurging;
+            this.Router.MessagesPurged += Router_MessagesPurged;
+            this.Router.IsPaused = this.IsPaused;
 
             // Start the Service
             await Task.WhenAll(this.Listener.StartAsync(cancellationToken),
@@ -272,6 +310,16 @@ namespace SMTPRouter
         private void Listener_SessionCreated(object sender, SmtpServer.SessionEventArgs e)
         {
             SessionCreated?.Invoke(sender, e);
+        }
+
+        private void Router_MessagesPurged(object sender, PurgeFilesEventArgs e)
+        {
+            MessagesPurged?.Invoke(sender, e);
+        }
+
+        private void Router_MessagePurging(object sender, PurgeFileEventArgs e)
+        {
+            MessagePurging?.Invoke(sender, e);
         }
 
         /// <summary>
