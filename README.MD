@@ -1,4 +1,4 @@
-# Smtp Router - v1.0.0.4
+# Smtp Router - v1.0.0.5
 [![nuget](https://img.shields.io/nuget/v/SmtpRouter.svg)](https://www.nuget.org/packages/SmtpRouter/) 
 ![GitHub release](https://img.shields.io/github/release/diassoft/SmtpRouter.svg)
 ![NuGet](https://img.shields.io/nuget/dt/SmtpRouter.svg)
@@ -255,19 +255,40 @@ By default the SmtpRouter offers the following Routing Rules:
 | :--- | :--- |
 | `MailFromDomainRoutingRule` | A rule that verifies if the **domain** on the **mail from** matches the domain configured on the rule. |
 | `MailFromRegexMatchRoutingRule` | A a rule that runs a `System.Text.RegularExpressions` to validate the **mail from**. |
-| `RelayRoutingRule` | A a rule always returns **true**. Use it when you need an **SMTP Relay** that routes messages just one single server |
+| `RelayRoutingRule` | A a rule always returns **true**. Use it when you need an **SMTP Relay** that routes messages just one single server. You can modify the email sender by setting the `ReplaceMailFromAddress` to another email address. |
 
 The code below demonstrates how to add a `MailFromDomainRoutingRule` to the `Router` object: 
 ```cs
 Router.RoutingRules.Add(new MailFromDomainRoutingRule(10, "mydomain.com", "mydomain"));
 ```
 
-You can create your own Routing Rules by inheriting from `RoutingRule` class, as demonstrated on the code below:
+There is a static method in the `RoutingRule` class that allows to create a `RoutingRule` dynamically:
+
+```cs
+var ruleGmail = Models.RoutingRule.CreateRule(10, 
+                                              "SMTPRouter.Models.MailFromDomainRoutingRule, SMTPRouter", 
+                                              "Gmail", 
+                                              "Domain=gmail.com");
+
+var ruleRegex = Models.RoutingRule.CreateRule(20, 
+                                              "SMTPRouter.Models.MailFromRegexMatchRoutingRule, SMTPRouter", 
+                                              "Regex", 
+                                              "RegexExpression=\d");
+
+var ruleRelay = Models.RoutingRule.CreateRule(30, 
+                                              "SMTPRouter.Models.RelayRoutingRule, SMTPRouter", 
+                                              "Relay");
+```
+
+You can define your own Routing Rules by inheriting from `RoutingRule` class, as demonstrated on the code below:
 
 ```cs
 public sealed class MyCustomRoutingRule: RoutingRule
 {
-    public MyCustomRoutingRule(): this(0)
+    // The Default Constructor
+    //   you always have to provide a parameterless constructor for a RoutingRule
+    //   otherwise the System.Reflection will not be able to instantiate it
+    public MyCustomRoutingRule(): this(0, "")
     {
             
     }

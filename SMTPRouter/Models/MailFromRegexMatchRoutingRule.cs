@@ -25,10 +25,7 @@ namespace SMTPRouter.Models
         /// <summary>
         /// Initializes a new instance of a <see cref="MailFromRegexMatchRoutingRule"/>
         /// </summary>
-        public MailFromRegexMatchRoutingRule() : this(0, "", "")
-        {
-
-        }
+        public MailFromRegexMatchRoutingRule() : this(0, "", "") { }
 
         /// <summary>
         /// Initializes a new instance of a <see cref="MailFromRegexMatchRoutingRule"/>
@@ -59,5 +56,17 @@ namespace SMTPRouter.Models
             // Get the Domain of the Mail From
             return Regex.Match(mailFrom.Address, RegexExpression).Success;
         }
+
+        /// <summary>
+        /// Generates a string with the Routing Rule contents
+        /// </summary>
+        /// <returns>A <see cref="string"/> contaning the Routing Rule information</returns>
+        public override string ToString()
+        {
+            return string.Format("{0}\n{1}",
+                     base.ToString(),
+                     base.FormatForToString("Regex Expression", RegexExpression));
+        }
+
     }
 }

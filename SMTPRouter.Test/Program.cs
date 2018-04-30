@@ -23,9 +23,14 @@ namespace SMTPRouter.Test
             Console.WriteLine("Test SMTPRouter (.NET Framework Version)");
             Console.WriteLine("===================================================================================");
             Console.WriteLine();
-            Console.WriteLine("1 - Test Using a Server Component");
-            Console.WriteLine("2 - Test Using Listener and Router Individually");
+            Console.WriteLine("SMTP Routing");
+            Console.WriteLine("   1 - Test Using a Server Component");
+            Console.WriteLine("   2 - Test Using Listener and Router Individually");
             Console.WriteLine();
+            Console.WriteLine("Other");
+            Console.WriteLine("  90 - Create a Routing Rule dynamically");
+            Console.WriteLine();
+
             Console.Write("Enter your selection --> ");
 
             string answer = Console.ReadLine();
@@ -38,11 +43,30 @@ namespace SMTPRouter.Test
             {
                 TestIndividual();
             }
+            else if (answer == "90")
+            {
+                CreateRuleDynamically();
+            }
 
             Console.WriteLine();
             Console.WriteLine("Press any key to shutdown...");
             Console.ReadLine();
 
+        }
+
+        private static void CreateRuleDynamically()
+        {
+            Console.WriteLine();
+            var mailFromDomainRoutingRule = Models.RoutingRule.CreateRule(10, "SMTPRouter.Models.MailFromDomainRoutingRule, SMTPRouter", "Gmail", "Domain=gmail.com");
+            Console.WriteLine(mailFromDomainRoutingRule.ToString());
+
+            Console.WriteLine();
+            var regexRoutingRule = Models.RoutingRule.CreateRule(20, "SMTPRouter.Models.MailFromRegexMatchRoutingRule, SMTPRouter", "Gmail", "RegexExpression=[U]");
+            Console.WriteLine(regexRoutingRule.ToString());
+
+            Console.WriteLine();
+            var relayRoutingRule = Models.RoutingRule.CreateRule(30, "SMTPRouter.Models.RelayRoutingRule, SMTPRouter", "Gmail", "");
+            Console.WriteLine(relayRoutingRule.ToString());
         }
 
         static void TestServer()
