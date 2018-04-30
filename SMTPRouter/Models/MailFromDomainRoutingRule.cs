@@ -25,10 +25,7 @@ namespace SMTPRouter.Models
         /// <summary>
         /// Initializes a new instance of a <see cref="MailFromDomainRoutingRule"/>
         /// </summary>
-        public MailFromDomainRoutingRule(): this(0, "","")
-        {
-            
-        }
+        public MailFromDomainRoutingRule(): this(0, "","") { }
 
         /// <summary>
         /// Initializes a new instance of a <see cref="MailFromDomainRoutingRule"/>
@@ -62,6 +59,17 @@ namespace SMTPRouter.Models
 
             // Try to match rule
             return (mailFromContents[1].Trim().ToUpper() == Domain.Trim().ToUpper());
+        }
+
+        /// <summary>
+        /// Generates a string with the Routing Rule contents
+        /// </summary>
+        /// <returns>A <see cref="string"/> contaning the Routing Rule information</returns>
+        public override string ToString()
+        {
+            return string.Format("{0}\n{1}",
+                                 base.ToString(),
+                                 base.FormatForToString("Domain", Domain));
         }
     }
 }
