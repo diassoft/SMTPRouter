@@ -197,20 +197,21 @@ namespace SMTPRouter
             for (char c = '0'; c <= '9'; c++) lookup[c] = true;
             for (char c = 'A'; c <= 'Z'; c++) lookup[c] = true;
             for (char c = 'a'; c <= 'z'; c++) lookup[c] = true;
-            lookup['.'] = true;
-            lookup['_'] = true;
             lookup['!'] = true;
+            lookup['@'] = true;
             lookup['#'] = true;
             lookup['$'] = true;
             lookup['%'] = true;
+            lookup['^'] = true;
             lookup['&'] = true;
             lookup['*'] = true;
-            lookup['+'] = true;
+            lookup['.'] = true;
             lookup['-'] = true;
-            lookup['/'] = true;
+            lookup['_'] = true;
+            lookup['+'] = true;
             lookup['='] = true;
+            lookup['/'] = true;
             lookup['?'] = true;
-            lookup['^'] = true;
             lookup['`'] = true;
             lookup['{'] = true;
             lookup['|'] = true;
@@ -328,8 +329,12 @@ namespace SMTPRouter
                                                 for (int _iPosition = 0; _iPosition < _address.Length; _iPosition++)
                                                 {
                                                     char _c = _address[_iPosition];
-                                                    if (lookup[_c])
-                                                        _sb.Append(_c);
+
+                                                    if (_c < 65530)
+                                                    {
+                                                        if (lookup[_c])
+                                                            _sb.Append(_c);
+                                                    }
                                                 }
 
                                                 // Try to parse the address, if valid then add it to the list
