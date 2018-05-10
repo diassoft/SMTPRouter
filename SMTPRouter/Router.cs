@@ -316,6 +316,7 @@ namespace SMTPRouter
                                             // Ok there is some sort of separator, parse it into the proper list
                                             string[] _addresses = _headerContents.Split(separator);
 
+                                            // Clear the existing list, it will be repopulated based on the addresses array
                                             _list.Clear();
 
                                             foreach (var _address in _addresses)
@@ -345,6 +346,12 @@ namespace SMTPRouter
                                 _parseHeaderMailAccounts(HeaderId.To, message.To);
                                 _parseHeaderMailAccounts(HeaderId.Cc, message.Cc);
                                 _parseHeaderMailAccounts(HeaderId.Bcc, message.Bcc);
+
+                                // The message must have at least one "To", "Cc" or "Bcc"
+                                if ((message.To.Count == 0) &&
+                                    (message.Cc.Count == 0) &&
+                                    (message.Bcc.Count == 0))
+                                    throw new Exception("The message has no destination address");
 
                                 // Routes the Message
                                 RouteMessage(message);

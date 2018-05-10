@@ -52,15 +52,13 @@ namespace SMTPRouter
                 var machineHostName = System.Net.Dns.GetHostName();
 
                 var receiveByString = string.Format("from [{0}] ({0}) by {1} ({2}) with Smtp Router Service; {3}",
-                    sourceIpAddress, 
-                    machineHostName,
-                    machineIpAddress,
-                    DateTime.Now.ToString("ddd, dd MMM yyy HH’:’mm’:’ss ‘GMT"));
+                                                    sourceIpAddress,
+                                                    machineHostName,
+                                                    machineIpAddress,
+                                                    DateTime.Now.ToString("ddd, dd MMM yyy HH’:’mm’:’ss ‘GMT"));
 
                 // Append Received-By to the MimeMessage Header
                 mimeMessage.Headers.Add(HeaderId.Received, receiveByString);
-
-                // Remove Special Characters
 
                 // Trigger Event to inform a message was received
                 MessageReceived?.Invoke(this, new MessageEventArgs(mimeMessage));
