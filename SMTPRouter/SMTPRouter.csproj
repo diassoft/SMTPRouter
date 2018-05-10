@@ -11,7 +11,7 @@ A SMTP Router is an object that will receive SMTP messages and forward it to ano
     <Copyright>© 2018 Diassoft Corporation</Copyright>
     <Version>1.0.0.6</Version>
     <AssemblyVersion>1.0.0.6</AssemblyVersion>
-    <PackageProjectUrl>https://github.com/diassoft/SMTPRouter/releases/tag/v1.0.0.5</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/diassoft/SMTPRouter/releases/tag/v1.0.0.6</PackageProjectUrl>
     <PackageIconUrl>https://github.com/diassoft/Branding/blob/master/Nuget-Package-Icon-v01.png?raw=true</PackageIconUrl>
     <RepositoryUrl>https://github.com/diassoft/SMTPRouter</RepositoryUrl>
     <RepositoryType>Public</RepositoryType>
