@@ -315,7 +315,7 @@ namespace SMTPRouter
                                         if (separator != '\0')
                                         {
                                             // Ok there is some sort of separator, parse it into the proper list
-                                            string[] _addresses = _headerContents.Split(separator);
+                                            string[] _addresses = _headerContents.Split(new char[] { separator }, StringSplitOptions.RemoveEmptyEntries);
 
                                             // Clear the existing list, it will be repopulated based on the addresses array
                                             _list.Clear();
@@ -337,11 +337,15 @@ namespace SMTPRouter
                                                     }
                                                 }
 
-                                                // Try to parse the address, if valid then add it to the list
-                                                if (MailboxAddress.TryParse(_sb.ToString(), out MailboxAddress _newMailboxAddress))
-                                                    _list.Add(_newMailboxAddress);
-                                                else
-                                                    throw new Exception($"Unable to parse '{_sb.ToString()}' to a valid email address");
+                                                // Ensure the address it not blank before trying to parse it
+                                                if (!String.IsNullOrEmpty(_sb.ToString()))
+                                                {
+                                                    // Try to parse the address, if valid then add it to the list
+                                                    if (MailboxAddress.TryParse(_sb.ToString(), out MailboxAddress _newMailboxAddress))
+                                                        _list.Add(_newMailboxAddress);
+                                                    else
+                                                        throw new Exception($"Unable to parse '{_sb.ToString()}' to a valid email address");
+                                                }
                                             }
                                         }
                                     }
