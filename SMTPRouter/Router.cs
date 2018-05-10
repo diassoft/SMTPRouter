@@ -59,6 +59,17 @@ namespace SMTPRouter
     public sealed class Router
     {
 
+        #region Private
+
+        /// <summary>
+        /// Lookup array for special characters
+        /// </summary>
+        /// <remarks>
+        /// Valid characters are set to true</remarks>
+        private bool[] lookup;
+
+        #endregion Private
+
         #region Properties
 
         /// <summary>
@@ -181,6 +192,34 @@ namespace SMTPRouter
             // Set the folder structure
             Folders = new WorkingFolders(queuePath);
 
+            // Create Lookup Array (valid characters for email address)
+            lookup = new bool[65536];
+            for (char c = '0'; c <= '9'; c++) lookup[c] = true;
+            for (char c = 'A'; c <= 'Z'; c++) lookup[c] = true;
+            for (char c = 'a'; c <= 'z'; c++) lookup[c] = true;
+            lookup['!'] = true;
+            lookup['@'] = true;
+            lookup['#'] = true;
+            lookup['$'] = true;
+            lookup['%'] = true;
+            lookup['^'] = true;
+            lookup['&'] = true;
+            lookup['*'] = true;
+            lookup['.'] = true;
+            lookup['-'] = true;
+            lookup['_'] = true;
+            lookup['+'] = true;
+            lookup['='] = true;
+            lookup['/'] = true;
+            lookup['?'] = true;
+            lookup['`'] = true;
+            lookup['{'] = true;
+            lookup['|'] = true;
+            lookup['}'] = true;
+            lookup['~'] = true;
+            lookup['<'] = true;
+            lookup['>'] = true;
+
             // Initialize Collections
             DestinationSmtps = new Dictionary<string, SmtpConfiguration>();
             RoutingRules = new List<RoutingRule>();
@@ -249,6 +288,80 @@ namespace SMTPRouter
                                 // Load MimeMessage
                                 message = MimeMessage.Load(fi.FullName);
 
+                                // Internal function to parse email headers and prevent bug where the "To" header contains different separators than the expected
+                                void _parseHeaderMailAccounts(HeaderId _headerId, InternetAddressList _list)
+                                {
+                                    // Clear Separator
+                                    char separator = '\0';
+
+                                    // Ensure only valid headers are processed
+                                    if ((_headerId != HeaderId.To) &&
+                                        (_headerId != HeaderId.Cc) &&
+                                        (_headerId != HeaderId.Bcc)) return;
+
+                                    // Check for the given header (either "To", "Cc" or "Bcc")
+                                    if (message.Headers.Contains(_headerId))
+                                    {
+                                        // Read header information and look for the separator
+                                        string _headerContents = message.Headers[_headerId];
+                                        if (_headerContents.Contains(";"))
+                                            separator = ';';
+                                        else if (_headerContents.Contains(","))
+                                            separator = ',';
+                                        else if (_headerContents.Contains("|"))
+                                            separator = '|';
+
+                                        // A separator was found, so list can be processed
+                                        if (separator != '\0')
+                                        {
+                                            // Ok there is some sort of separator, parse it into the proper list
+                                            string[] _addresses = _headerContents.Split(new char[] { separator }, StringSplitOptions.RemoveEmptyEntries);
+
+                                            // Clear the existing list, it will be repopulated based on the addresses array
+                                            _list.Clear();
+
+                                            foreach (var _address in _addresses)
+                                            {
+                                                // Uses a StringBuilder to speed up the process
+                                                StringBuilder _sb = new StringBuilder(_address.Length);
+
+                                                // Check each individual character of the list and only keep valid characters ([0-9], [@], [A-Z], [a-z], [.])
+                                                for (int _iPosition = 0; _iPosition < _address.Length; _iPosition++)
+                                                {
+                                                    char _c = _address[_iPosition];
+
+                                                    if (_c < 65530)
+                                                    {
+                                                        if (lookup[_c])
+                                                            _sb.Append(_c);
+                                                    }
+                                                }
+
+                                                // Ensure the address it not blank before trying to parse it
+                                                if (!String.IsNullOrEmpty(_sb.ToString()))
+                                                {
+                                                    // Try to parse the address, if valid then add it to the list
+                                                    if (MailboxAddress.TryParse(_sb.ToString(), out MailboxAddress _newMailboxAddress))
+                                                        _list.Add(_newMailboxAddress);
+                                                    else
+                                                        throw new Exception($"Unable to parse '{_sb.ToString()}' to a valid email address");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Parse Headers
+                                _parseHeaderMailAccounts(HeaderId.To, message.To);
+                                _parseHeaderMailAccounts(HeaderId.Cc, message.Cc);
+                                _parseHeaderMailAccounts(HeaderId.Bcc, message.Bcc);
+
+                                // The message must have at least one "To", "Cc" or "Bcc"
+                                if ((message.To.Count == 0) &&
+                                    (message.Cc.Count == 0) &&
+                                    (message.Bcc.Count == 0))
+                                    throw new Exception("The message has no destination address");
+
                                 // Routes the Message
                                 RouteMessage(message);
 
@@ -284,8 +397,8 @@ namespace SMTPRouter
                     }
                 }
 
-                // Wait 10 seconds before trying again
-                Task.Delay(10000).Wait(cancellationToken);
+                // Wait 2 seconds before trying again
+                Task.Delay(2000).Wait(cancellationToken);
             }
         }
 

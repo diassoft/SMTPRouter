@@ -125,6 +125,10 @@ namespace SMTPRouter.Test
             // Send Emails
             SendEmail("user@gmail.com", "user@gmail.com", 1);
             SendEmail("user@hotmail.com", "user@hotmail.com", 2);
+            SendEmail(new MailboxAddress("User Name", "user@gmail.com"), new MailboxAddress("User Name", "user@gmail.com"), 3);
+
+            SendEmailUsingDefaultClient("user@gmail.com", "user@gmail.com;user2@gmail.com", 10);
+            SendEmailUsingDefaultClient("user@hotmail.com", "user@hotmail.com", 10);
         }
 
         private static void TestIndividual()
@@ -196,6 +200,9 @@ namespace SMTPRouter.Test
             // Send Emails
             SendEmail("user@gmail.com", "user@gmail.com", 10);
             SendEmail("user@hotmail.com", "user@hotmail.com", 22);
+
+            SendEmailUsingDefaultClient("user@gmail.com", "user@gmail.com", 10);
+            SendEmailUsingDefaultClient("user@hotmail.com", "user@hotmail.com", 10);
         }
 
 
@@ -297,6 +304,7 @@ namespace SMTPRouter.Test
             MimeMessage message = new MimeMessage();
             message.From.Add(new MailboxAddress(from));
             message.To.Add(new MailboxAddress(to));
+            message.To.Add(new MailboxAddress("testing2@gmail.com"));
 
             BodyBuilder builder = new BodyBuilder();
             builder.TextBody = $"Hey User, this is just a test; Number {number}";
@@ -321,6 +329,54 @@ namespace SMTPRouter.Test
                 Console.WriteLine($"StackTrace: {e.StackTrace}");
                 Console.WriteLine();
             }
+        }
+
+        private static void SendEmail(MailboxAddress from, MailboxAddress to, int number)
+        {
+            MimeMessage message = new MimeMessage();
+            message.From.Add(from);
+            message.To.Add(to);
+
+            BodyBuilder builder = new BodyBuilder();
+            builder.TextBody = $"Hey User, this is just a test; Number {number}";
+
+            message.Subject = $"Email Routed {number}";
+            message.Body = builder.ToMessageBody();
+
+            try
+            {
+                SmtpClient smtpClient = new SmtpClient();
+                smtpClient.Connect("localhost", 25, MailKit.Security.SecureSocketOptions.Auto);
+
+                smtpClient.Send(message);
+
+                smtpClient.Disconnect(true);
+
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Unable to send email to Local Smtp");
+                Console.WriteLine($"Error: {e.Message}");
+                Console.WriteLine($"StackTrace: {e.StackTrace}");
+                Console.WriteLine();
+            }
+        }
+
+        private static void SendEmailUsingDefaultClient(string from, string to, int number)
+        {
+            var client = new System.Net.Mail.SmtpClient()
+            {
+                Host = "localhost",
+                Port = 25,
+                UseDefaultCredentials = true,
+            };
+
+            //var message = new System.Net.Mail.MailMessage(from, to);
+            //message.Subject = $"Email routed with default SMTP Client {number}";
+            //message.Body = $"Hey, this is just a test; Number {number}";
+
+            //client.Send(from, to, "Email routed with default SMTP Client", "This is just a test");
+            
         }
     }
 }
