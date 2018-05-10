@@ -76,9 +76,12 @@ namespace SMTPRouter
         /// <summary>
         /// Retrieves current Local IP
         /// </summary>
-        /// <returns></returns>
+        /// <returns>A <see cref="String"/> containing the current IP Address</returns>
         private string GetLocalIP()
         {
+            // The easiest way to get an accurate local IP address is using this logic
+            // When running in virtual machines, it's likely it will not retrieve the proper information, that is the reason why this method was used
+            // Refer to Stackoverflow https://stackoverflow.com/questions/6803073/get-local-ip-address to have a better understanding
             using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.IP))
             {
                 socket.Connect("8.8.8.8", 65530);
