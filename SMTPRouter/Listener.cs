@@ -75,6 +75,11 @@ namespace SMTPRouter
         public event EventHandler<MessageEventArgs> MessageReceived;
 
         /// <summary>
+        /// Event triggered when a message is received but not processed
+        /// </summary>
+        public event EventHandler<MessageErrorEventArgs> MessageReceivedWithErrors;
+
+        /// <summary>
         /// Event triggered when an SMTP Session is created
         /// </summary>
         public event EventHandler<SessionEventArgs> SessionCreated;
@@ -147,6 +152,7 @@ namespace SMTPRouter
             // Setup the MessageStore
             SmtpMessageStore smtpMessageStore = new SmtpMessageStore();
             smtpMessageStore.MessageReceived += SmtpMessageStore_MessageReceived;
+            smtpMessageStore.MessageReceivedWithErrors += SmtpMessageStore_MessageReceivedWithErrors;
 
             // Configure the SMTP Server Parameters
             if (this.RequiresAuthentication)
@@ -195,6 +201,12 @@ namespace SMTPRouter
         {
             // Trigger the MessageReceived event for the Listener
             MessageReceived?.Invoke(sender, e);
+        }
+
+        private void SmtpMessageStore_MessageReceivedWithErrors(object sender, MessageErrorEventArgs e)
+        {
+            // Trigger the MessageReceivedWithErrors for the Listener
+            MessageReceivedWithErrors?.Invoke(sender, e);
         }
 
         private void ServerSession_OnCommandExecuting(object sender, SmtpCommandExecutingEventArgs e)

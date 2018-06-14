@@ -290,7 +290,7 @@ namespace SMTPRouter.Models
 
                             // Add remaining lines
                             while ((!fileStreamReader.EndOfStream))
-                                messageStreamWriter.Write(fileStreamReader.ReadLine());
+                                messageStreamWriter.WriteLine(fileStreamReader.ReadLine());
 
                             // Load Message
                             messageStream.Position = 0;
@@ -302,9 +302,9 @@ namespace SMTPRouter.Models
                 // Returns the Routable Message
                 return routableMessage;
             }
-            catch
+            catch (Exception e)
             {
-                throw;
+                throw e;
             }
         }
 
