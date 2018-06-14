@@ -64,27 +64,6 @@ namespace SMTPRouter
     /// </example>
     public sealed class Server
     {
-        #region Server Properties
-
-        private bool _isPaused;
-        /// <summary>
-        /// Defines whether the routing process is Paused or Running
-        /// </summary>
-        /// <remarks>This property triggers the property <see cref="Router.IsPaused"/> if the <see cref="Router"/> is initialized</remarks>
-        public bool IsPaused
-        {
-            get { return _isPaused; }
-            set
-            {
-                _isPaused = value;
-
-                if (this.Router != null)
-                    this.Router.IsPaused = _isPaused;
-            }
-        }
-
-        #endregion Server Properties
-
         #region Listener Properties
 
         /// <summary>
@@ -151,66 +130,22 @@ namespace SMTPRouter
         /// The <see cref="TimeSpan"/> a message remains on queues. By default a message remains there for 90 days before being purged.
         /// </summary>
         public TimeSpan MessagePurgeLifespan { get; set; }
-        
+
         #endregion Router Properties
 
-        #region Listener Events
+        #region Server Events
 
         /// <summary>
-        /// Event triggered when the Listener started to listen to smtp messages
+        /// Event triggered when the Listener starts
         /// </summary>
-        public event EventHandler<EventArgs> ListeningStarted;
+        public event EventHandler<EventArgs> ListenerStarted;
 
         /// <summary>
-        /// Event triggered when a message is received
+        /// Event triggered when the Router starts
         /// </summary>
-        public event EventHandler<MessageEventArgs> MessageReceived;
+        public event EventHandler<EventArgs> RouterStarted;
 
-        /// <summary>
-        /// Event trigered when a SMTP Command is being executed
-        /// </summary>
-        public event EventHandler<SmtpCommandExecutingEventArgs> SessionCommandExecuting;
-        /// <summary>
-        /// Event triggered when a SMTP Session is created
-        /// </summary>
-        public event EventHandler<SessionEventArgs> SessionCreated;
-        /// <summary>
-        /// Event triggered when a SMTP Session is closed
-        /// </summary>
-        public event EventHandler<SessionEventArgs> SessionCompleted;
-
-        #endregion Listener Events
-
-        #region Router Events
-
-        /// <summary>
-        /// Event triggered when a message is routed successfully
-        /// </summary>
-        public event EventHandler<MessageEventArgs> MessageRoutedSuccessfully;
-
-        /// <summary>
-        /// Event triggered when a message could not be routed successfully
-        /// </summary>
-        public event EventHandler<MessageErrorEventArgs> MessageNotRouted;
-
-        /// <summary>
-        /// Event triggered when a message is about to be purged by the system.
-        /// </summary>
-        /// <remarks>You can prevent the purge by changing the <see cref="PurgeFileEventArgs.Cancel"/> property to true</remarks>
-        public event EventHandler<PurgeFileEventArgs> MessagePurging;
-
-        /// <summary>
-        /// Event triggered after messages are purged
-        /// </summary>
-        public event EventHandler<PurgeFilesEventArgs> MessagesPurged;
-
-        /// <summary>
-        /// Event triggered when a general error happens on the processing
-        /// </summary>
-        /// <remarks>Usually general errors stop the processing so it's important to handle this event</remarks>
-        public event EventHandler<GeneralErrorEventArgs> GeneralError;
-
-        #endregion Router Events
+        #endregion Server Events
 
         #region Constructors
 
@@ -247,7 +182,6 @@ namespace SMTPRouter
             UseSSL = useSSL;
             QueueName = queueName;
             QueuePath = queuePath;
-            IsPaused = false;
             MessageLifespan = new TimeSpan(0, 15, 0);
             MessagePurgeLifespan = new TimeSpan(90, 0, 0, 0);
         }
@@ -260,18 +194,15 @@ namespace SMTPRouter
         /// Starts the Server <see cref="Listener"/> and <see cref="Router"/>
         /// </summary>
         /// <param name="cancellationToken">The Cancellation Task</param>
-        /// <returns></returns>
+        /// <returns>An awaitable task with the Start</returns>
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             // Validate Variables before starting the service
 
             // Initializes the Listener and hook events
             this.Listener = new Listener(this.ServerName, this.Ports, this.RequiresAuthentication, this.UseSSL);
-            this.Listener.SessionCreated += Listener_SessionCreated;
-            this.Listener.SessionCompleted += Listener_SessionCompleted;
-            this.Listener.SessionCommandExecuting += Listener_SessionCommandExecuting;
-            this.Listener.ListeningStarted += Listener_ListeningStarted;
             this.Listener.MessageReceived += Listener_MessageReceived;
+            ListenerStarted?.Invoke(this, new EventArgs());
 
             // Initializes the Router and hook events
             this.Router = new Router(this.QueueName, this.QueuePath)
@@ -281,12 +212,7 @@ namespace SMTPRouter
                 MessageLifespan = this.MessageLifespan,
                 MessagePurgeLifespan = this.MessagePurgeLifespan
             };
-            this.Router.GeneralError += Router_GeneralError;
-            this.Router.MessageNotRouted += Router_MessageNotRouted;
-            this.Router.MessageRoutedSuccessfully += Router_MessageRoutedSuccessfully;
-            this.Router.MessagePurging += Router_MessagePurging;
-            this.Router.MessagesPurged += Router_MessagesPurged;
-            this.Router.IsPaused = this.IsPaused;
+            RouterStarted?.Invoke(this, new EventArgs());
 
             // Start the Service
             await Task.WhenAll(this.Listener.StartAsync(cancellationToken),
@@ -297,87 +223,15 @@ namespace SMTPRouter
 
         #region Internal Event Handlers
 
-        private void Listener_SessionCommandExecuting(object sender, SmtpServer.SmtpCommandExecutingEventArgs e)
-        {
-            SessionCommandExecuting?.Invoke(sender, e);
-        }
-
-        private void Listener_SessionCompleted(object sender, SmtpServer.SessionEventArgs e)
-        {
-            SessionCompleted?.Invoke(sender, e);
-        }
-
-        private void Listener_SessionCreated(object sender, SmtpServer.SessionEventArgs e)
-        {
-            SessionCreated?.Invoke(sender, e);
-        }
-
-        private void Router_MessagesPurged(object sender, PurgeFilesEventArgs e)
-        {
-            MessagesPurged?.Invoke(sender, e);
-        }
-
-        private void Router_MessagePurging(object sender, PurgeFileEventArgs e)
-        {
-            MessagePurging?.Invoke(sender, e);
-        }
-
         /// <summary>
-        /// Event triggered when the Router successfully routed a message
+        /// Handle the MessageReceived event by enqueuing the message on the for the Routing Service
         /// </summary>
-        /// <param name="sender">The sender of the event</param>
-        /// <param name="e">Arguments containing the message that was routed</param>
-        private void Router_MessageRoutedSuccessfully(object sender, MessageEventArgs e)
-        {
-            // Raises the MessageRouterSuccesfully Event
-            MessageRoutedSuccessfully?.Invoke(sender, e);
-        }
-
-        /// <summary>
-        /// Event triggered when the Router could not route a message
-        /// </summary>
-        /// <param name="sender">The sender of the event</param>
-        /// <param name="e">Arguments containing the message that could not be routed and the exception that caused it</param>
-        private void Router_MessageNotRouted(object sender, MessageErrorEventArgs e)
-        {
-            // Raises the MessageNotRoutedSuccesfully Event
-            MessageNotRouted?.Invoke(sender, e);
-        }
-
-        /// <summary>
-        /// Event triggered when a General Error happened on the router
-        /// </summary>
-        /// <param name="sender">The sender of the event</param>
-        /// <param name="e">Arguments containing the exception</param>
-        private void Router_GeneralError(object sender, GeneralErrorEventArgs e)
-        {
-            // Raises the General Error Event
-            GeneralError?.Invoke(sender, e);
-        }
-
-        /// <summary>
-        /// Event triggered when the SMTP Messages started to be listened
-        /// </summary>
-        /// <param name="sender">The sender of the event</param>
-        /// <param name="e">Arguments</param>
-        private void Listener_ListeningStarted(object sender, EventArgs e)
-        {
-            // Raises the Listening Started Event for the Server Component
-            ListeningStarted?.Invoke(sender, e);
-        }
-
-        /// <summary>
-        /// Event triggered everytime a message arrives on the SMTP
-        /// </summary>
-        /// <param name="sender">The sender of the event</param>
-        /// <param name="e">Event Arguments containing the Message that was received</param>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void Listener_MessageReceived(object sender, MessageEventArgs e)
         {
             // Sends the Message to the Router
-            this.Router.Enqueue(e.MimeMessage);
-
-            // Raises the Message Received Event for the Server Component
-            MessageReceived?.Invoke(sender, e);
+            this.Router.Enqueue(e.RoutableMessage);
         }
 
         #endregion Internal Event Handlers

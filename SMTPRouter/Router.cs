@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Xml.Serialization;
+using System.Collections.Concurrent;
 
 namespace SMTPRouter
 {
@@ -38,6 +39,9 @@ namespace SMTPRouter
     ///                 RequiresAuthentication = true,
     ///                 User = "user@gmail.com",
     ///                 Password = "",
+    ///                 SecureSocketOption = 1,
+    ///                 ActiveConnections = 1,
+    ///                 GroupingOption = FileGroupingOptions.GroupByDateAndHour
     ///             }
     ///         },
     ///         { "hotmail", new Models.SmtpConfiguration()
@@ -48,27 +52,20 @@ namespace SMTPRouter
     ///                 RequiresAuthentication = true,
     ///                 User = "user@hotmail.com",
     ///                 Password = "",
+    ///                 SecureSocketOption = 1,
+    ///                 ActiveConnections = 1,
+    ///                 GroupingOption = FileGroupingOptions.GroupByDateAndHour
     ///             }
     ///         }
     ///     },
     /// };
     /// router.MessageRoutedSuccessfully += Server_MessageRoutedSuccessfully;
     /// router.MessageNotRouted += Server_MessageNotRouted;
+    /// router.MessageNotSent += Server_MessageNotSent;
     /// </code>
     /// </example>
     public sealed class Router
     {
-
-        #region Private
-
-        /// <summary>
-        /// Lookup array for special characters
-        /// </summary>
-        /// <remarks>
-        /// Valid characters are set to true</remarks>
-        private bool[] lookup;
-
-        #endregion Private
 
         #region Properties
 
@@ -133,6 +130,26 @@ namespace SMTPRouter
         public event EventHandler<MessageErrorEventArgs> MessageNotRouted;
 
         /// <summary>
+        /// Event triggered when a message is queued successfully
+        /// </summary>
+        public event EventHandler<MessageEventArgs> MessageQueuedSuccessfully;
+
+        /// <summary>
+        /// Event triggered when a message could not be queued successfully
+        /// </summary>
+        public event EventHandler<MessageErrorEventArgs> MessageNotQueued;
+
+        /// <summary>
+        /// Event triggered when a message is sent successfully
+        /// </summary>
+        public event EventHandler<MessageEventArgs> MessageSentSuccessfully;
+
+        /// <summary>
+        /// Event triggered when a message could not be sent successfully
+        /// </summary>
+        public event EventHandler<MessageErrorEventArgs> MessageNotSent;
+
+        /// <summary>
         /// Event triggered when a message is about to be purged by the system.
         /// </summary>
         /// <remarks>You can prevent the purge by changing the <see cref="PurgeFileEventArgs.Cancel"/> property to true</remarks>
@@ -150,6 +167,20 @@ namespace SMTPRouter
         public event EventHandler<GeneralErrorEventArgs> GeneralError;
 
         #endregion Events
+
+        #region Concurrent Queues
+
+        /// <summary>
+        /// Array of Smtp Message Queues
+        /// </summary>
+        internal ConcurrentQueue<RoutableMessage>[] SmtpQueues;
+
+        /// <summary>
+        /// The Queue containing the messages to be routed
+        /// </summary>
+        internal ConcurrentQueue<RoutableMessage> MessagesToRouteQueue;
+
+        #endregion Concurrent Queues
 
         #region Constructors
 
@@ -192,34 +223,6 @@ namespace SMTPRouter
             // Set the folder structure
             Folders = new WorkingFolders(queuePath);
 
-            // Create Lookup Array (valid characters for email address)
-            lookup = new bool[65536];
-            for (char c = '0'; c <= '9'; c++) lookup[c] = true;
-            for (char c = 'A'; c <= 'Z'; c++) lookup[c] = true;
-            for (char c = 'a'; c <= 'z'; c++) lookup[c] = true;
-            lookup['!'] = true;
-            lookup['@'] = true;
-            lookup['#'] = true;
-            lookup['$'] = true;
-            lookup['%'] = true;
-            lookup['^'] = true;
-            lookup['&'] = true;
-            lookup['*'] = true;
-            lookup['.'] = true;
-            lookup['-'] = true;
-            lookup['_'] = true;
-            lookup['+'] = true;
-            lookup['='] = true;
-            lookup['/'] = true;
-            lookup['?'] = true;
-            lookup['`'] = true;
-            lookup['{'] = true;
-            lookup['|'] = true;
-            lookup['}'] = true;
-            lookup['~'] = true;
-            lookup['<'] = true;
-            lookup['>'] = true;
-
             // Initialize Collections
             DestinationSmtps = new Dictionary<string, SmtpConfiguration>();
             RoutingRules = new List<RoutingRule>();
@@ -229,8 +232,7 @@ namespace SMTPRouter
             {
                 // Create Folders if they do not exist already
                 if (!Directory.Exists(Folders.OutgoingFolder)) Directory.CreateDirectory(Folders.OutgoingFolder);
-                if (!Directory.Exists(Folders.SentFolder)) Directory.CreateDirectory(Folders.SentFolder);
-                if (!Directory.Exists(Folders.RetryFolder)) Directory.CreateDirectory(Folders.RetryFolder);
+                if (!Directory.Exists(Folders.InQueueFolder)) Directory.CreateDirectory(Folders.InQueueFolder);
                 if (!Directory.Exists(Folders.ErrorFolder)) Directory.CreateDirectory(Folders.ErrorFolder);
             }
             catch (Exception e)
@@ -251,317 +253,404 @@ namespace SMTPRouter
         /// <returns></returns>
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            await Task.WhenAll(Task.Run(() => ProcessOutgoingQueue(cancellationToken)),
-                               Task.Run(() => ProcessRetryQueue(cancellationToken)),
-                               Task.Run(() => PurgeQueues(cancellationToken))).ConfigureAwait(false);
-        }
+            // Verify the number of Smtp Connections
+            if (DestinationSmtps.Count == 0)
+                throw new ArgumentException($"'{nameof(DestinationSmtps)}' cannot be empty. You need to have at least one Smtp Connection in order to start routing messages.");
+
+            // Create SmtpQUeues Array
+            SmtpQueues = new ConcurrentQueue<RoutableMessage>[DestinationSmtps.Count];
+
+            // List of Tasks to be running in parallel
+            List<Task> TaskList = new List<Task>();
+
+            // Add Background Tasks
+            TaskList.Add(new Task(() => EnqueueOutgoingMessages(cancellationToken)));
+            TaskList.Add(new Task(() => RouteMessages(cancellationToken)));
+            TaskList.Add(new Task(() => PurgeOldMessages(cancellationToken)));
+
+            // Create the MessagesToRouteQueue
+            MessagesToRouteQueue = new ConcurrentQueue<RoutableMessage>();
+
+            // Initialize SMTP Connections
+
+            // Set Queue Numbers
+            int QueueNumber = 0;
+
+            foreach (KeyValuePair<string, SmtpConfiguration> kvp in DestinationSmtps)
+            {
+                // Initialize folder structure for each Smtp Key
+                kvp.Value.SetWorkingDirectory(Path.Combine(this.QueuePath, "Routed"));
+                if (!Directory.Exists(kvp.Value.Folders.InQueueFolder)) Directory.CreateDirectory(kvp.Value.Folders.InQueueFolder);
+                if (!Directory.Exists(kvp.Value.Folders.SentFolder)) Directory.CreateDirectory(kvp.Value.Folders.SentFolder);
+                if (!Directory.Exists(kvp.Value.Folders.ErrorFolder)) Directory.CreateDirectory(kvp.Value.Folders.ErrorFolder);
+
+                // Set Index for the Smtp Connection
+                DestinationSmtps[kvp.Key].QueueNumber = QueueNumber;
+
+                // Create the Queue
+                SmtpQueues[QueueNumber] = new ConcurrentQueue<RoutableMessage>();
+
+                // Number of Connections
+                int tempActiveConnections = System.Math.Max(kvp.Value.ActiveConnections, 1);
+
+                // Create the Tasks
+                for (int connectionNumber = 1; connectionNumber <= tempActiveConnections; connectionNumber++)
+                {
+                    int tempConnectionNumber = connectionNumber;
+                    TaskList.Add(new Task(() => SendRoutedMessages(tempConnectionNumber, kvp.Value, cancellationToken)));
+                }
+                    
+
+                QueueNumber++;
+            }
+
+            // Enqueue all existing messages back to the Message Queues
+            EnqueueExistingInQueueMessages();
+
+            // Start All Async Tasks
+            for (int t = 0; t < TaskList.Count; t++)
+                TaskList[t].Start();
+
+            // Start the Tasks
+            await Task.WhenAll(TaskList.ToArray()).ConfigureAwait(false);
+         }
 
         #endregion Initialization Methods
 
-        #region Queue Methods
+        #region Message Processing Methods
 
         /// <summary>
-        /// Processes the messages on the Outgoing Queue
+        /// Adds a <see cref="RoutableMessage"/> to the Messages To Route queue
         /// </summary>
-        /// <param name="cancellationToken">The cancellation token</param>
-        private void ProcessOutgoingQueue(CancellationToken cancellationToken)
+        /// <param name="routableMessage">A <see cref="RoutableMessage"/> to be routed</param>
+        /// <remarks>If the <see cref="RoutableMessage.FileName"/> is empty, the system understand this is a brand new message, therefore it will create a file and send it to the 'InQueue' folder</remarks>
+        public bool Enqueue(RoutableMessage routableMessage)
         {
-            while (cancellationToken.IsCancellationRequested == false)
+            // Current File Location
+            string FileCurrentLocation = routableMessage.FileName;
+
+            try
             {
-                // Ensure the service is not paused
-                if (!IsPaused)
+                // When there is no file name, it's a brand new message. Dump the file to the folder
+                if (string.IsNullOrEmpty(routableMessage.FileName))
                 {
-                    // Get messages from the Outgoing Folder
-                    try
-                    {
-                        // Get all files to process (since the number of files is usually small, it is ok to use GetFiles method)
-                        DirectoryInfo dirInfo = new DirectoryInfo(Folders.OutgoingFolder);
-                        IEnumerable<FileInfo> files = dirInfo.EnumerateFiles("*.EML");
-                        
-                        // Process each file on the queue, but sort it by creation time
-                        foreach (FileInfo fi in (from f in files orderby f.CreationTime select f))
-                        {
-                            MimeMessage message = null;
-
-                            try
-                            {
-                                // Load MimeMessage
-                                message = MimeMessage.Load(fi.FullName);
-
-                                // Internal function to parse email headers and prevent bug where the "To" header contains different separators than the expected
-                                void _parseHeaderMailAccounts(HeaderId _headerId, InternetAddressList _list)
-                                {
-                                    // Clear Separator
-                                    char separator = '\0';
-
-                                    // Ensure only valid headers are processed
-                                    if ((_headerId != HeaderId.To) &&
-                                        (_headerId != HeaderId.Cc) &&
-                                        (_headerId != HeaderId.Bcc)) return;
-
-                                    // Check for the given header (either "To", "Cc" or "Bcc")
-                                    if (message.Headers.Contains(_headerId))
-                                    {
-                                        // Read header information and look for the separator
-                                        string _headerContents = message.Headers[_headerId];
-                                        if (_headerContents.Contains(";"))
-                                            separator = ';';
-                                        else if (_headerContents.Contains(","))
-                                            separator = ',';
-                                        else if (_headerContents.Contains("|"))
-                                            separator = '|';
-
-                                        // A separator was found, so list can be processed
-                                        if (separator != '\0')
-                                        {
-                                            // Ok there is some sort of separator, parse it into the proper list
-                                            string[] _addresses = _headerContents.Split(new char[] { separator }, StringSplitOptions.RemoveEmptyEntries);
-
-                                            // Clear the existing list, it will be repopulated based on the addresses array
-                                            _list.Clear();
-
-                                            foreach (var _address in _addresses)
-                                            {
-                                                // Uses a StringBuilder to speed up the process
-                                                StringBuilder _sb = new StringBuilder(_address.Length);
-
-                                                // Check each individual character of the list and only keep valid characters ([0-9], [@], [A-Z], [a-z], [.])
-                                                for (int _iPosition = 0; _iPosition < _address.Length; _iPosition++)
-                                                {
-                                                    char _c = _address[_iPosition];
-
-                                                    if (_c < 65530)
-                                                    {
-                                                        if (lookup[_c])
-                                                            _sb.Append(_c);
-                                                    }
-                                                }
-
-                                                // Ensure the address it not blank before trying to parse it
-                                                if (!String.IsNullOrEmpty(_sb.ToString()))
-                                                {
-                                                    // Try to parse the address, if valid then add it to the list
-                                                    if (MailboxAddress.TryParse(_sb.ToString(), out MailboxAddress _newMailboxAddress))
-                                                        _list.Add(_newMailboxAddress);
-                                                    else
-                                                        throw new Exception($"Unable to parse '{_sb.ToString()}' to a valid email address");
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Parse Headers
-                                _parseHeaderMailAccounts(HeaderId.To, message.To);
-                                _parseHeaderMailAccounts(HeaderId.Cc, message.Cc);
-                                _parseHeaderMailAccounts(HeaderId.Bcc, message.Bcc);
-
-                                // The message must have at least one "To", "Cc" or "Bcc"
-                                if ((message.To.Count == 0) &&
-                                    (message.Cc.Count == 0) &&
-                                    (message.Bcc.Count == 0))
-                                    throw new Exception("The message has no destination address");
-
-                                // Routes the Message
-                                RouteMessage(message);
-
-                                // Send it to the SentFolder
-                                File.Move(fi.FullName, Path.Combine(Folders.SentFolder, Path.GetFileName(fi.FullName)));
-
-                                // Throws the event to inform the message was sent
-                                MessageRoutedSuccessfully?.Invoke(this, new MessageEventArgs(message));
-                            }
-                            catch (Exception e)
-                            {
-                                // Get the file information
-                                if ((DateTime.Now - fi.CreationTime).TotalSeconds > MessageLifespan.TotalSeconds)
-                                {
-                                    // Message Expired the Lifespan, send it to the error queue
-                                    File.Move(fi.FullName, Path.Combine(Folders.ErrorFolder, Path.GetFileName(fi.FullName)));
-                                }
-                                else
-                                {
-                                    // Message did not expire the Lifespan, send it to the retry queue
-                                    File.Move(fi.FullName, Path.Combine(Folders.RetryFolder, Path.GetFileName(fi.FullName)));
-                                }
-
-                                // Invoke the MessageNotRouted Event
-                                MessageNotRouted?.Invoke(this, new MessageErrorEventArgs(message, e));
-                            }
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        // Call the GeneralError Event Handler
-                        GeneralError?.Invoke(this, new GeneralErrorEventArgs(e, nameof(ProcessOutgoingQueue)));
-                    }
+                    routableMessage.FileName = Path.Combine(Folders.InQueueFolder,
+                                                            string.Format("{0}-{1}.EML", routableMessage.CreationDateTime.ToString("yyyyMMddHHmmss"), Guid.NewGuid().ToString()));
+                    routableMessage.SaveToFile();
+                    FileCurrentLocation = routableMessage.FileName;
                 }
 
-                // Wait 2 seconds before trying again
-                Task.Delay(2000).Wait(cancellationToken);
+                // Move file to the InQueue folder, unless it's already there
+                if (routableMessage.FileName != Path.Combine(Folders.InQueueFolder, Path.GetFileName(routableMessage.FileName)))
+                {
+                    File.Move(routableMessage.FileName, Path.Combine(Folders.InQueueFolder, Path.GetFileName(routableMessage.FileName)));
+                    FileCurrentLocation = Path.Combine(Folders.InQueueFolder, Path.GetFileName(routableMessage.FileName));
+                    routableMessage.FileName = FileCurrentLocation;
+                }
+
+                // Add to the concurrent queue
+                MessagesToRouteQueue.Enqueue(routableMessage);
+
+                // Notify the message has been queued
+                MessageQueuedSuccessfully?.Invoke(this, new MessageEventArgs(routableMessage));
+
+                return true;
+            }
+            catch (Exception e)
+            {
+                // Move file to the Error Queue (there is no Retry Queue for first level messages)
+                File.Move(FileCurrentLocation, Path.Combine(Folders.ErrorFolder, Path.GetFileName(routableMessage.FileName)));
+
+                // Notify that the message was not queued
+                MessageNotQueued?.Invoke(this, new MessageErrorEventArgs(routableMessage, e));
+
+                return false;
             }
         }
 
         /// <summary>
-        /// Routes the Message to the proper SMTP
+        /// Adds a <see cref="RoutableMessage"/> to the Messages To Route queue
         /// </summary>
-        /// <param name="message">A <see cref="MimeMessage"/> to be routed</param>
-        private void RouteMessage(MimeMessage message)
+        /// <param name="fileName">The path where the message is located</param>
+        public bool Enqueue(string fileName)
+        {
+            return Enqueue(RoutableMessage.LoadFromFile(fileName));
+        }
+
+        /// <summary>
+        /// Enqueue all messages already existing on the InQueue. It will do it for the InQueue folder on the Root level and also for the InQueue folder inside each Smtp Connection.
+        /// </summary>
+        /// <remarks>This should only be called during the Initialization of the Router</remarks>
+        private void EnqueueExistingInQueueMessages()
+        {
+            // Get all files to process (since the number of files is usually small, it is ok to use GetFiles method)
+            DirectoryInfo dirInfo = new DirectoryInfo(Folders.InQueueFolder);
+            IEnumerable<FileInfo> files = dirInfo.EnumerateFiles("*.EML");
+
+            foreach (FileInfo fi in files)
+                Enqueue(fi.FullName);
+
+            // Now enqueue messages already routed
+            foreach (var kvp in DestinationSmtps)
+            {
+                dirInfo = new DirectoryInfo(kvp.Value.Folders.InQueueFolder);
+                files = dirInfo.EnumerateFiles("*.EML");
+
+                foreach (FileInfo fi in files)
+                    SmtpQueues[kvp.Value.QueueNumber].Enqueue(RoutableMessage.LoadFromFile(fi.FullName));
+            }
+        }
+
+        /// <summary>
+        /// Enqueue messages on the Outgoing Queue by adding them to the <see cref="MessagesToRouteQueue"/> and move the file to the "InQueue" folder
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token</param>
+        private void EnqueueOutgoingMessages(CancellationToken cancellationToken)
+        {
+            while (cancellationToken.IsCancellationRequested == false)
+            {
+                if (!IsPaused)
+                {
+                    // Get all files to process (since the number of files is usually small, it is ok to use GetFiles method)
+                    DirectoryInfo dirInfo = new DirectoryInfo(Folders.OutgoingFolder);
+                    IEnumerable<FileInfo> files = dirInfo.EnumerateFiles("*.EML");
+
+                    foreach (FileInfo fi in files)
+                        Enqueue(fi.FullName);
+
+                    // Wait before attempting again
+                    Task.Delay(2000).Wait(cancellationToken);
+                }
+                else
+                {
+                    // Nothing to do other than wait a few seconds before trying again
+                    Task.Delay(5000).Wait(cancellationToken);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Get messages form the <see cref="MessagesToRouteQueue"/> and routes them to the proper Smtp Queue
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <remarks>This method is expected to be run in different tasks at the same time, hence it uses a <see cref="ConcurrentQueue{T}"/> to avoid deadlocks</remarks>
+        private void RouteMessages(CancellationToken cancellationToken)
+        {
+            while (cancellationToken.IsCancellationRequested == false)
+            {
+                if (!IsPaused)
+                {
+                    // Pull next message from the queue
+                    if (MessagesToRouteQueue.TryDequeue(out RoutableMessage routableMessage))
+                    {
+                        // The Message Current Location
+                        string FileCurrentLocation = routableMessage.FileName;
+
+                        // Route the message that just came from the queue
+                        try
+                        {
+                            // Validate Rules
+                            if (RoutingRules == null)
+                                throw new Exception("No rules configured to process routing. The message will be sent to the Error Queue after exceeding the Maximum Number of Attempts.");
+
+                            if (RoutingRules?.Count == 0)
+                                throw new Exception("No rules configured to process routing. The message will be sent to the Error Queue after exceeding the Maximum Number of Attempts.");
+
+                            // Validate SMTP Configurations
+                            if (DestinationSmtps == null)
+                                throw new Exception("There is no SMTP configuration to route the emails to. The message will be sent to the Error Queue after exceeding the Maximum Number of Attempts");
+
+                            if (DestinationSmtps?.Count == 0)
+                                throw new Exception("There is no SMTP configuration to route the emails to. The message will be sent to the Error Queue after exceeding the Maximum Number of Attempts");
+
+                            // Ensure there is a valid Routable Message
+                            if (routableMessage == null)
+                                throw new Exception("The Routable Message is not valid");
+
+                            // Ensure there is a valid MimeMessage
+                            if (routableMessage.Message == null)
+                                throw new Exception("The MimeMessage is nov valid");
+
+                            // The rule selected for use
+                            RoutingRule selectedRule = null;
+
+                            // Fetch Rules sorted by the Execution Sequence
+                            foreach (RoutingRule rule in (from r in RoutingRules orderby r.ExecutionSequence select r))
+                            {
+                                // Try the rule
+                                if (rule.Match(routableMessage))
+                                {
+                                    selectedRule = rule;
+
+                                    // No need to continue loop
+                                    break;
+                                }
+                            }
+
+                            // Ensure a rule was found
+                            if (selectedRule == null)
+                                throw new Exception($"Unable to find a {nameof(RoutingRule)} for the given message");
+
+                            // Verify SMTP Connection
+                            if (string.IsNullOrWhiteSpace(selectedRule.SmtpConfigurationKey))
+                                throw new Exception($"The {nameof(selectedRule.SmtpConfigurationKey)} is empty");
+
+                            if (!DestinationSmtps.ContainsKey(selectedRule.SmtpConfigurationKey))
+                                throw new Exception($"There is no Smtp configured for the key '{selectedRule.SmtpConfigurationKey}'");
+
+                            SmtpConfiguration smtpConfiguration = DestinationSmtps[selectedRule.SmtpConfigurationKey];
+
+                            if (smtpConfiguration == null)
+                                throw new ArgumentNullException($"The Smtp by the key '{selectedRule.SmtpConfigurationKey}' is misconfigured");
+
+                            // All checks passed, Send it to the proper queue
+
+                            // Move files and enqueue
+                            File.Move(routableMessage.FileName, Path.Combine(smtpConfiguration.Folders.InQueueFolder, Path.GetFileName(routableMessage.FileName)));
+                            FileCurrentLocation = Path.Combine(smtpConfiguration.Folders.InQueueFolder, Path.GetFileName(routableMessage.FileName));
+                            routableMessage.FileName = FileCurrentLocation;
+                            SmtpQueues[smtpConfiguration.QueueNumber].Enqueue(routableMessage);
+
+                            // Notify the message was routed
+                            MessageRoutedSuccessfully?.Invoke(this, new MessageEventArgs(routableMessage));
+                        }
+                        catch (Exception e)
+                        {
+                            // Move the message to the retry or error folder
+                            File.Move(FileCurrentLocation, Path.Combine(Folders.ErrorFolder, Path.GetFileName(FileCurrentLocation)));
+
+                            // Notify the message was not routed
+                            MessageNotRouted?.Invoke(this, new MessageErrorEventArgs(routableMessage, new MessageNotRoutedException(routableMessage, e)));
+                        }
+                    }
+                    else
+                    {
+                        // Wait two seconds before trying again
+                        Task.Delay(2000).Wait(cancellationToken);
+                    }
+                }
+                else
+                {
+                    // Nothing to do other than wait a few seconds before trying again
+                    Task.Delay(5000).Wait(cancellationToken);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Process the Smtp Queue for messages already routed
+        /// </summary>
+        /// <param name="connectionNumber">The number of the connection on the same queue. This information is inserted on the header of the MimeMessage</param>
+        /// <param name="smtpConfiguration">The configuration information for the queue</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <remarks>This method is expected to run into multiple tasks, hence it uses a <see cref="ConcurrentQueue{T}"/></remarks>
+        private void SendRoutedMessages(int connectionNumber, SmtpConfiguration smtpConfiguration, CancellationToken cancellationToken)
         {
             try
             {
-                // Validate Rules
-                if (RoutingRules == null)
-                    throw new Exception("No rules configured to process routing. The message will be sent to the Error Queue after exceeding the Maximum Number of Attempts.");
+                // Connects to the Smtp
+                SmtpClient client = new SmtpClient();
 
-                if (RoutingRules?.Count == 0)
-                    throw new Exception("No rules configured to process routing. The message will be sent to the Error Queue after exceeding the Maximum Number of Attempts.");
-
-                // Validate SMTP Configurations
-                if (DestinationSmtps == null)
-                    throw new Exception("There is no SMTP configuration to route the emails to. The message will be sent to the Error Queue after exceeding the Maximum Number of Attempts");
-
-                if (DestinationSmtps?.Count == 0)
-                    throw new Exception("There is no SMTP configuration to route the emails to. The message will be sent to the Error Queue after exceeding the Maximum Number of Attempts");
-
-                // Ensure there is a valid MimeMessage
-                if (message == null)
-                    throw new Exception("The Message is not valid");
-
-                // The rule selected for use
-                RoutingRule selectedRule = null;
-
-                // Fetch Rules sorted by the Execution Sequence
-                foreach (RoutingRule rule in (from r in RoutingRules orderby r.ExecutionSequence select r))
+                // Internal Method to Open the Smtp Connection
+                void _ConnectSmtp()
                 {
-                    // Try the rule
-                    if (rule.Match(message))
-                    {
-                        selectedRule = rule;
+                    client.Connect(smtpConfiguration.Host,
+                                   smtpConfiguration.Port,
+                                   (MailKit.Security.SecureSocketOptions)smtpConfiguration.SecureSocketOption);
 
-                        // No need to continue loop
-                        break;
+                    if (smtpConfiguration.RequiresAuthentication)
+                    {
+                        client.Authenticate(smtpConfiguration.User,
+                                            smtpConfiguration.Password);
                     }
                 }
 
-                // Ensure a rule was found
-                if (selectedRule == null)
-                    throw new Exception($"Unable to find a {nameof(RoutingRule)} for the given message");
+                // Connects to the Smtp
+                _ConnectSmtp();
 
-                // Verify SMTP Connection
-                if (string.IsNullOrWhiteSpace(selectedRule.SmtpConfigurationKey))
-                    throw new Exception($"The {nameof(selectedRule.SmtpConfigurationKey)} is empty");
-
-                if (!DestinationSmtps.ContainsKey(selectedRule.SmtpConfigurationKey))
-                    throw new Exception($"There is no Smtp configured for the key '{selectedRule.SmtpConfigurationKey}'");
-
-                SmtpConfiguration smtpConfiguration = DestinationSmtps[selectedRule.SmtpConfigurationKey];
-                
-                if (smtpConfiguration == null)
-                    throw new ArgumentNullException($"The Smtp by the key '{selectedRule.SmtpConfigurationKey}' is misconfigured");
-
-                // Checks SSL
-                if (smtpConfiguration.UseSSL)
+                while (cancellationToken.IsCancellationRequested == false)
                 {
-                    smtpConfiguration.Port = 465;
-                    smtpConfiguration.SecureSocketOption = 2;
+                    try
+                    {
+                        // Try to issue a NoOp command to ensure the connection is still alive
+                        client.NoOp();
+                    }
+                    catch
+                    {
+                        // Connection is no longer alive, reopen
+                        try
+                        {
+                            _ConnectSmtp();
+                        }
+                        catch
+                        {
+                            throw;
+                        }
+                        
+                    }
+
+                    // Pull a message from the queue
+                    if (SmtpQueues[smtpConfiguration.QueueNumber].TryDequeue(out RoutableMessage routableMessage))
+                    {
+                        try
+                        {
+                            // Append details to the header
+                            var receiveByString = string.Format("from Queue [{0}] at Connection [{1}] of Smtp Key [{2}] with Smtp Router Service; {3}",
+                                                                (smtpConfiguration.QueueNumber+1),
+                                                                connectionNumber,
+                                                                smtpConfiguration.Key,
+                                                                DateTime.Now.ToString("ddd, dd MMM yyy HH’:’mm’:’ss ‘GMT"));
+
+                            routableMessage.Message.Headers.Add(HeaderId.Received, receiveByString);
+
+                            // Create folder to store sent files
+                            string SentFolder = smtpConfiguration.Folders.SentFolderWithGroupingOptions(routableMessage.CreationDateTime);
+                            if (!Directory.Exists(SentFolder)) Directory.CreateDirectory(SentFolder);
+
+                            // Sends the message with the active connection
+                            client.Send(routableMessage.Message, routableMessage.MailFrom, routableMessage.Recipients);
+
+                            // Move file to the sent folder
+                            File.Move(routableMessage.FileName, Path.Combine(SentFolder, Path.GetFileName(routableMessage.FileName)));
+
+                            // Notify that a message has been sent
+                            MessageSentSuccessfully?.Invoke(this, new MessageEventArgs(routableMessage));
+                        }
+                        catch (Exception e)
+                        {
+                            // Message Expired the Lifespan, send it to the error queue
+                            File.Move(routableMessage.FileName, Path.Combine(smtpConfiguration.Folders.ErrorFolder, Path.GetFileName(routableMessage.FileName)));
+
+                            // Notify that a message was not Sent
+                            MessageNotSent?.Invoke(this, new MessageErrorEventArgs(routableMessage, e));
+                        }
+                    }
+                    else
+                    {
+                        // Wait for a few seconds before trying again
+                        Task.Delay(3000).Wait(cancellationToken);
+                    }
                 }
 
-                // Connect to the SMTP
-                SmtpClient client = new SmtpClient();
-
-                client.Connect(smtpConfiguration.Host,
-                               smtpConfiguration.Port,
-                               (MailKit.Security.SecureSocketOptions)smtpConfiguration.SecureSocketOption);
-
-                if (smtpConfiguration.RequiresAuthentication)
-                {
-                    client.Authenticate(smtpConfiguration.User,
-                                        smtpConfiguration.Password);
-                }
-
-                // Sends the MimeMessage thru the SMTP
-                client.Send(message);
-
-                // Quit session
+                // Disconnects if cancellation token has changed
                 client.Disconnect(true);
             }
             catch (Exception e)
             {
-                // The system could not route the message
-                throw new MessageNotSentException(message, e);
+                // NOthing else to try, notifies system about the issue
+                GeneralError?.Invoke(this, new GeneralErrorEventArgs(new Exception("Smtp Queue could not be initialized", e), nameof(SendRoutedMessages)));
             }
         }
 
-        /// <summary>
-        /// Processes the messages on the Retry Queue
-        /// </summary>
-        /// <param name="cancellationToken">The cancellation token</param>
-        private void ProcessRetryQueue(CancellationToken cancellationToken)
-        {
-            while (cancellationToken.IsCancellationRequested == false)
-            {
-                // Ensure the service is not paused
-                if (!IsPaused)
-                {
-                    // Get messages from the RetryFolder
-                    try
-                    {
-                        // Get all files to process (since the number of files is usually small, it is ok to use GetFiles method)
-                        string[] filesToProcess = Directory.GetFiles(Folders.RetryFolder, "*.EML");
-                        Array.Sort<string>(filesToProcess);
+        #endregion Message Processing Methods
 
-                        // Process each file on the queue
-                        foreach (string file in filesToProcess)
-                        {
-                            // Move file to the Outgoing Queue
-                            File.Move(file, Path.Combine(Folders.OutgoingFolder, Path.GetFileName(file)));
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        // Call the GeneralError Event Handler
-                        GeneralError?.Invoke(this, new GeneralErrorEventArgs(e, nameof(ProcessRetryQueue)));
-                    }
-                }
-
-                // Wait 1 minutes before trying again
-                Task.Delay(60000).Wait(cancellationToken);
-            }
-        }
-
-        /// <summary>
-        /// Adds a message to the proper queue
-        /// </summary>
-        /// <param name="message"></param>
-        /// <exception cref="MessageNotQueuedException">Throw when a message could not be added to the queue</exception>
-        public void Enqueue(MimeMessage message)
-        {
-            // Defines the file name
-            string messageFilename = string.Format("{0}-{1}.EML", DateTime.Now.ToString("yyyyMMddHHmmss"), Guid.NewGuid().ToString());
-
-            try
-            {
-                // Defines the format of the file
-                FormatOptions dosLineFormat = new FormatOptions()
-                {
-                    NewLineFormat = NewLineFormat.Dos,
-                };
-
-                // Writes it to a text file
-                message.WriteTo(dosLineFormat, Path.Combine(Folders.OutgoingFolder, messageFilename));
-            }
-            catch (Exception e)
-            {
-                throw new MessageNotQueuedException(message, e);
-            }
-        }
+        #region Queue Methods
 
         /// <summary>
         /// Purges queues for messages older then the <see cref="MessagePurgeLifespan"/>
         /// </summary>
         /// <param name="cancellationToken">The cancellation token</param>
-        public void PurgeQueues(CancellationToken cancellationToken)
+        public void PurgeOldMessages(CancellationToken cancellationToken)
         {
             while (cancellationToken.IsCancellationRequested == false)
             {
@@ -618,7 +707,7 @@ namespace SMTPRouter
                     catch (Exception e)
                     {
                         // Call the GeneralError Event Handler
-                        GeneralError?.Invoke(this, new GeneralErrorEventArgs(e, nameof(PurgeQueues)));
+                        GeneralError?.Invoke(this, new GeneralErrorEventArgs(e, nameof(PurgeOldMessages)));
                     }
 
                     // Wait for 10 minutes before trying it again (cancellationToken forces it to exit too)
@@ -633,99 +722,6 @@ namespace SMTPRouter
         }
 
         #endregion Queue Methods
-
-        #region Setup Data Load Methods
-
-        /// <summary>
-        /// Load Routing Rules from a Text File
-        /// </summary>
-        /// <param name="filename">The file name</param>
-        /// <param name="appendToCurrentRules">A flag to define whether to append to the existing <see cref="RoutingRules"/> or to replace the existing rules</param>
-        /// <returns>A <see cref="bool"/> to inform if the rules were loaded</returns>
-        public bool LoadRoutingRules(string filename, bool appendToCurrentRules = false)
-        {
-            //TODO: Implement this method
-            throw new NotImplementedException();
-        }
-
-        /// <summary>
-        /// Saves the existing routing rules to a text file
-        /// </summary>
-        /// <param name="filename">The file name</param>
-        public void SaveRoutingRules(string filename)
-        {
-            //TODO: Implement this method
-            throw new NotImplementedException();
-        }
-
-        /// <summary>
-        /// Load Smtp Configuration from a Text File
-        /// </summary>
-        /// <param name="filename">The file name</param>
-        /// <param name="appendToCurrentConfiguration">A flag to define whether to append to the existing <see cref="DestinationSmtps"/> or to replace the existing Smtps</param>
-        /// <returns></returns>
-        public bool LoadSmtpConfiguration(string filename, bool appendToCurrentConfiguration = false)
-        {
-            //TODO: Implement this method
-            throw new NotImplementedException();
-        }
-
-        /// <summary>
-        /// Saves the existing Smtp Configuration to a Text File
-        /// </summary>
-        /// <param name="filename">The file name</param>
-        public void SaveSmtpConfiguration(string filename)
-        {
-            //TODO: Implement this method
-            throw new NotImplementedException();
-        }
-
-        #endregion Setup Data Load Methods
-
     }
-
-    #region Auxiliary Classes
-
-    /// <summary>
-    /// A class peresenting the working folders of the <see cref="Router"/>
-    /// </summary>
-    public sealed class WorkingFolders
-    {
-        /// <summary>
-        /// Initializes a new instance of Working Folders
-        /// </summary>
-        internal WorkingFolders(): this(System.IO.Directory.GetCurrentDirectory()) { }
-
-        /// <summary>
-        /// Initializes a new instance of Working Folders
-        /// </summary>
-        /// <param name="rootFolder">The root folder</param>
-        internal WorkingFolders(string rootFolder)
-        {
-            RootFolder = rootFolder;
-        }
-
-        /// <summary>
-        /// The root folder
-        /// </summary>
-        public string RootFolder { get; internal set; }
-        /// <summary>
-        /// The folder where the pending messages should be sent to
-        /// </summary>
-        public string OutgoingFolder { get { return System.IO.Path.Combine(RootFolder, "Outgoing"); } }
-        /// <summary>
-        /// The folder where all sent messages are stored
-        /// </summary>
-        public string SentFolder { get { return System.IO.Path.Combine(RootFolder, "Sent"); } }
-        /// <summary>
-        /// The folder where all messages to resend are stored
-        /// </summary>
-        public string RetryFolder { get { return System.IO.Path.Combine(RootFolder, "Retry"); } }
-        /// <summary>
-        /// The folder where all messages that were not sent after the <see cref="Router.MessageLifespan"/> expires
-        /// </summary>
-        public string ErrorFolder { get { return System.IO.Path.Combine(RootFolder, "Error"); } }
-    }
-
-    #endregion Auxiliary Classes
+        
 }

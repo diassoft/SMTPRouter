@@ -51,9 +51,9 @@ namespace SMTPRouter.Models
         /// <summary>
         /// Validates the Rule
         /// </summary>
-        /// <param name="mimeMessage">Reference to the <see cref="MimeMessage"/></param>
+        /// <param name="routableMessage">Reference to the <see cref="MimeMessage"/></param>
         /// <returns>A <see cref="bool"/> to define whether the rule matches</returns>
-        public abstract bool Match(MimeMessage mimeMessage);
+        public abstract bool Match(RoutableMessage routableMessage);
 
         /// <summary>
         /// Creates a Routing Rule based on the input parameters. This function is very useful when reading configuration files.

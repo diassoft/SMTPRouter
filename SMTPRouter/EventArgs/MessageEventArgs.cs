@@ -7,10 +7,15 @@ using System.Text;
 namespace SMTPRouter
 {
     /// <summary>
-    /// Event Arguments for the event when a <see cref="MimeMessage"/> is received
+    /// Event Arguments for the event when a <see cref="RoutableMessage"/> is received
     /// </summary>
     public class MessageEventArgs: EventArgs
     {
+        /// <summary>
+        /// The message received
+        /// </summary>
+        public RoutableMessage RoutableMessage { get; protected set; }
+
         /// <summary>
         /// Initializes a new instance of the Message Received Event Arguments
         /// </summary>
@@ -22,18 +27,11 @@ namespace SMTPRouter
         /// <summary>
         /// Initializes a new instance of the Message Received Event Arguments
         /// </summary>
-        /// <param name="mimeMessage">The <see cref="MimeMessage"/> received by the Smtp</param>
-        public MessageEventArgs(MimeMessage mimeMessage)
+        /// <param name="routableMessage">The <see cref="RoutableMessage"/> received by the Smtp</param>
+        public MessageEventArgs(RoutableMessage routableMessage) 
         {
-            MimeMessage = mimeMessage;
+            RoutableMessage = routableMessage;
         }
-
-        /// <summary>
-        /// The message received
-        /// </summary>
-        public MimeMessage MimeMessage { get; set; }
-
-
 
     }
 }

@@ -42,19 +42,15 @@ namespace SMTPRouter.Models
         /// <summary>
         /// Checks if the <see cref="Regex">Regular Expression</see> defined on <see cref="RegexExpression"/> is valid. The comparison happens against the mail from.
         /// </summary>
-        /// <param name="mimeMessage">The Message to Check</param>
+        /// <param name="routableMessage">The Message to Check</param>
         /// <returns>A <see cref="bool"/> to inform whether the rule matches or not</returns>
-        public override bool Match(MimeMessage mimeMessage)
+        public override bool Match(RoutableMessage routableMessage)
         {
-            // Ensure there is only one sender
-            if (mimeMessage.From.Count != 1) return false;
-
             // Get the MailFrom from the Message
-            MailboxAddress mailFrom = mimeMessage.From[0] as MailboxAddress;
-            if (mailFrom == null) return false;
+            if (routableMessage.MailFrom == null) return false;
 
             // Get the Domain of the Mail From
-            return Regex.Match(mailFrom.Address, RegexExpression).Success;
+            return Regex.Match(routableMessage.MailFrom.Address, RegexExpression).Success;
         }
 
         /// <summary>

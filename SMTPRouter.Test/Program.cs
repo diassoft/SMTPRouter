@@ -72,7 +72,7 @@ namespace SMTPRouter.Test
         static void TestServer()
         {
             // Creates the Server
-            var server = new SMTPRouter.Server("localhost", 25, false, false, "SMTPRouter", "C:\\SMTPRouter\\Queues")
+            var server = new SMTPRouter.Server("localhost", 25, false, false, "SMTPRouter", "C:\\SMTPRouter2\\Queues")
             {
                 MessageLifespan = new TimeSpan(0, 15, 0),
                 RoutingRules = new List<Models.RoutingRule>()
@@ -84,12 +84,16 @@ namespace SMTPRouter.Test
                 {
                     { "gmail", new Models.SmtpConfiguration()
                         {
+                            Key = "Gmail",
                             Host = "smtp.gmail.com",
                             Description = "Google Mail SMTP",
                             Port = 587,
                             RequiresAuthentication = true,
                             User = "user@gmail.com",
                             Password = "",
+                            SecureSocketOption = 1,
+                            ActiveConnections = 1,
+                            GroupingOption = FileGroupingOptions.GroupByDateAndHour
                         }
                     },
                     { "hotmail", new Models.SmtpConfiguration()
@@ -100,21 +104,33 @@ namespace SMTPRouter.Test
                             RequiresAuthentication = true,
                             User = "user@hotmail.com",
                             Password = "",
+                            SecureSocketOption = 1,
+                            ActiveConnections = 1,
+                            GroupingOption = FileGroupingOptions.GroupByDateAndHour
                         }
                     }
                 },
             };
 
             // Hook Events
-            server.SessionCreated += Server_SessionCreated;
-            server.SessionCommandExecuting += Server_SessionCommandExecuting;
-            server.SessionCompleted += Server_SessionCompleted;
-            server.ListeningStarted += Server_ListeningStarted;
-            server.MessageReceived += Server_MessageReceived;
-            server.MessageRoutedSuccessfully += Server_MessageRoutedSuccessfully;
-            server.MessageNotRouted += Server_MessageNotRouted;
-            server.MessagePurging += Server_MessagePurging;
-            server.MessagesPurged += Server_MessagesPurged;
+            server.ListenerStarted += ((o, e) =>
+            {
+                server.Listener.SessionCreated += Server_SessionCreated;
+                server.Listener.SessionCommandExecuting += Server_SessionCommandExecuting;
+                server.Listener.SessionCompleted += Server_SessionCompleted;
+                server.Listener.ListeningStarted += Server_ListeningStarted;
+                server.Listener.MessageReceived += Server_MessageReceived;
+            });
+
+            server.RouterStarted += ((o, e) =>
+            {
+                server.Router.MessageRoutedSuccessfully += Server_MessageRoutedSuccessfully;
+                server.Router.MessageNotRouted += Server_MessageNotRouted;
+                server.Router.MessagePurging += Server_MessagePurging;
+                server.Router.MessagesPurged += Server_MessagesPurged;
+                server.Router.MessageNotSent += Server_MessageNotSent;
+                server.Router.MessageSentSuccessfully += Server_MessageSentSuccessfully;
+            });
 
             // Initialize Services
             Task.WhenAll(server.StartAsync(CancellationToken.None)).ConfigureAwait(false);
@@ -122,14 +138,22 @@ namespace SMTPRouter.Test
             // Pause Routing
             //server.Router.IsPaused = true;
 
-            // Send Emails
-            SendEmail("user@gmail.com", "user@gmail.com", 1);
-            SendEmail("user@hotmail.com", "user@hotmail.com", 2);
-            SendEmail(new MailboxAddress("User Name", "user@gmail.com"), new MailboxAddress("User Name", "user@gmail.com"), 3);
+            // Send 20 Emails
+            for (int iMail = 1; iMail <= 20; iMail++)
+            {
+                //SendEmail("user@gmail.com", "user@gmail.com", iMail);
+                //SendEmailTweakHeader("user@gmail.com", new List<string>() { "user@gmail.com" }, new List<string>() { "user@gmail.com", "user2@gmail.com" }, iMail);
+                //SendEmailBcc("user@gmail.com", new List<string>() { "user@gmail.com" }, new List<string>() { "user@hotmail.com" }, iMail);
+            }
+            
+            //SendEmail("user@gmail.com", "user@gmail.com", 1);
+            //SendEmail("user@hotmail.com", "user@hotmail.com", 2);
+            //SendEmail(new MailboxAddress("User Name", "user@gmail.com"), new MailboxAddress("User Name", "user@gmail.com"), 3);
 
-            SendEmailUsingDefaultClient("user@gmail.com", "user@gmail.com;user2@gmail.com", 10);
-            SendEmailUsingDefaultClient("user@hotmail.com", "user@hotmail.com", 10);
+            //SendEmailUsingDefaultClient("user@gmail.com", "user@gmail.com;user2@gmail.com", 10);
+            //SendEmailUsingDefaultClient("user@hotmail.com", "user@hotmail.com", 10);
         }
+
 
         private static void TestIndividual()
         {
@@ -161,7 +185,7 @@ namespace SMTPRouter.Test
                         {
                             Host = "smtp.gmail.com",
                             Description = "Google Mail SMTP",
-                            Port = 587,
+                            Port = 25,
                             RequiresAuthentication = true,
                             User = "user@gmail.com",
                             Password = "",
@@ -171,7 +195,7 @@ namespace SMTPRouter.Test
                         {
                             Host = "smtp.live.com",
                             Description = "Hotmail SMTP",
-                            Port = 587,
+                            Port = 25,
                             RequiresAuthentication = true,
                             User = "user@hotmail.com",
                             Password = "",
@@ -186,7 +210,7 @@ namespace SMTPRouter.Test
             listener.MessageReceived += (object sender, MessageEventArgs e) =>
             {
                 // Make sure to enqueue the message otherwise the router doesn't know about anything
-                router.Enqueue(e.MimeMessage);
+                router.Enqueue(e.RoutableMessage);
             };
             listener.MessageReceived += Server_MessageReceived;
 
@@ -200,11 +224,7 @@ namespace SMTPRouter.Test
             // Send Emails
             SendEmail("user@gmail.com", "user@gmail.com", 10);
             SendEmail("user@hotmail.com", "user@hotmail.com", 22);
-
-            SendEmailUsingDefaultClient("user@gmail.com", "user@gmail.com", 10);
-            SendEmailUsingDefaultClient("user@hotmail.com", "user@hotmail.com", 10);
         }
-
 
         #region Event Handlers
 
@@ -233,8 +253,8 @@ namespace SMTPRouter.Test
         {
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine("**** ERROR ****: Message Not Routed!");
-            Console.WriteLine($"From....: {((MailboxAddress)e.MimeMessage.From[0]).Address.ToString()}");
-            Console.WriteLine($"To......: {String.Join(",", (from t in e.MimeMessage.To where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
+            Console.WriteLine($"From....: {((MailboxAddress)e.RoutableMessage.MailFrom).Address.ToString()}");
+            Console.WriteLine($"To......: {String.Join(",", (from t in e.RoutableMessage.Recipients where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
             Console.WriteLine();
             Console.WriteLine("Exception:");
             Console.WriteLine($"   Error..........: {e.Exception.Message}");
@@ -256,8 +276,18 @@ namespace SMTPRouter.Test
         {
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine("Message Routed Successfully!");
-            Console.WriteLine($"From....: {((MailboxAddress)e.MimeMessage.From[0]).Address.ToString()}");
-            Console.WriteLine($"To......: {String.Join(",", (from t in e.MimeMessage.To where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
+            Console.WriteLine($"From....: {((MailboxAddress)e.RoutableMessage.MailFrom).Address.ToString()}");
+            Console.WriteLine($"To......: {String.Join(",", (from t in e.RoutableMessage.Recipients where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
+            Console.WriteLine("--------------------------------------------------------------------------------");
+            Console.WriteLine();
+        }
+
+        private static void Server_MessageSentSuccessfully(object sender, MessageEventArgs e)
+        {
+            Console.WriteLine("--------------------------------------------------------------------------------");
+            Console.WriteLine("Message Sent Successfully!");
+            Console.WriteLine($"From....: {((MailboxAddress)e.RoutableMessage.MailFrom).Address.ToString()}");
+            Console.WriteLine($"To......: {String.Join(",", (from t in e.RoutableMessage.Recipients where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine();
         }
@@ -284,10 +314,10 @@ namespace SMTPRouter.Test
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine("A message was received!!");
             Console.WriteLine();
-            Console.WriteLine($"From....: {((MailboxAddress)e.MimeMessage.From[0]).Address.ToString()}");
-            Console.WriteLine($"To......: {String.Join(",", (from t in e.MimeMessage.To where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
+            Console.WriteLine($"From....: {((MailboxAddress)e.RoutableMessage.MailFrom).Address.ToString()}");
+            Console.WriteLine($"To......: {String.Join(",", (from t in e.RoutableMessage.Recipients where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
             Console.WriteLine();
-            Console.WriteLine(e.MimeMessage.ToString());
+            Console.WriteLine(e.RoutableMessage.ToString());
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine();
         }
@@ -297,6 +327,29 @@ namespace SMTPRouter.Test
             Console.WriteLine("Listening Started...");
         }
 
+        private static void Server_MessageNotSent(object sender, MessageErrorEventArgs e)
+        {
+            Console.WriteLine("--------------------------------------------------------------------------------");
+            Console.WriteLine("**** ERROR ****: Message Not Sent!");
+            Console.WriteLine($"From....: {((MailboxAddress)e.RoutableMessage.MailFrom).Address.ToString()}");
+            Console.WriteLine($"To......: {String.Join(",", (from t in e.RoutableMessage.Recipients where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
+            Console.WriteLine();
+            Console.WriteLine("Exception:");
+            Console.WriteLine($"   Error..........: {e.Exception.Message}");
+            Console.WriteLine($"   Stack Trace....: {e.Exception.StackTrace}");
+
+            if (e.Exception.InnerException != null)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Inner Exception:");
+                Console.WriteLine($"   Error..........: {e.Exception.InnerException.Message}");
+                Console.WriteLine($"   Stack Trace....: {e.Exception.InnerException.StackTrace}");
+            }
+
+            Console.WriteLine("--------------------------------------------------------------------------------");
+            Console.WriteLine();
+        }
+
         #endregion Event Handlers
 
         private static void SendEmail(string from, string to, int number)
@@ -304,7 +357,6 @@ namespace SMTPRouter.Test
             MimeMessage message = new MimeMessage();
             message.From.Add(new MailboxAddress(from));
             message.To.Add(new MailboxAddress(to));
-            message.To.Add(new MailboxAddress("testing2@gmail.com"));
 
             BodyBuilder builder = new BodyBuilder();
             builder.TextBody = $"Hey User, this is just a test; Number {number}";
@@ -362,21 +414,141 @@ namespace SMTPRouter.Test
             }
         }
 
-        private static void SendEmailUsingDefaultClient(string from, string to, int number)
+        private static void SendEmailBcc(string from, List<string> bccRecipients, List<string> toHeader, int number)
         {
-            var client = new System.Net.Mail.SmtpClient()
+            MimeMessage message = new MimeMessage();
+            message.From.Add(new MailboxAddress(from));
+
+            foreach (var mailTo in toHeader)
+                message.To.Add(new MailboxAddress(mailTo));
+
+            foreach (var mailTo in bccRecipients)
+                message.Bcc.Add(new MailboxAddress(mailTo));
+
+            BodyBuilder builder = new BodyBuilder();
+            builder.TextBody = $"Hey User, this is just a test; Number {number}";
+
+            message.Subject = $"Email Routed {number}";
+            message.Body = builder.ToMessageBody();
+
+            try
             {
-                Host = "localhost",
-                Port = 25,
-                UseDefaultCredentials = true,
+                SmtpClient smtpClient = new SmtpClient();
+                smtpClient.Connect("localhost", 25, MailKit.Security.SecureSocketOptions.Auto);
+
+                List<MailboxAddress> mailboxAddresses = new List<MailboxAddress>();
+                foreach (var mailTo in bccRecipients)
+                    mailboxAddresses.Add(new MailboxAddress(mailTo));
+
+                smtpClient.Send(message, new MailboxAddress(from), mailboxAddresses);
+
+                smtpClient.Disconnect(true);
+
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Unable to send email to Local Smtp");
+                Console.WriteLine($"Error: {e.Message}");
+                Console.WriteLine($"StackTrace: {e.StackTrace}");
+                Console.WriteLine();
+            }
+        }
+
+
+        private static void SendEmailTweakHeader(string from, List<string> recipients, List<string> recipientsOnHeader, int number)
+        {
+            MimeMessage message = new MimeMessage();
+            message.From.Add(new MailboxAddress(from));
+
+            foreach (var mailTo in recipientsOnHeader)
+                message.To.Add(new MailboxAddress(mailTo));
+
+            BodyBuilder builder = new BodyBuilder();
+            builder.TextBody = $"Hey User, this is just a test; Number {number}";
+
+            message.Subject = $"Email Routed {number}";
+            message.Body = builder.ToMessageBody();
+
+            try
+            {
+                SmtpClient smtpClient = new SmtpClient();
+                smtpClient.Connect("localhost", 25, MailKit.Security.SecureSocketOptions.Auto);
+
+                List<MailboxAddress> mailboxAddresses = new List<MailboxAddress>();
+                foreach (var mailTo in recipients)
+                    mailboxAddresses.Add(new MailboxAddress(mailTo));
+
+                smtpClient.Send(message, new MailboxAddress(from), mailboxAddresses);
+
+                smtpClient.Disconnect(true);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Unable to send email to Local Smtp");
+                Console.WriteLine($"Error: {e.Message}");
+                Console.WriteLine($"StackTrace: {e.StackTrace}");
+                Console.WriteLine();
+            }
+        }
+
+        private static void SendEmailTweakHeader(string from, string to, string toHeader, int number)
+        {
+            MimeMessage message = new MimeMessage();
+            message.From.Add(new MailboxAddress(from));
+            message.To.Add(new MailboxAddress(to));
+
+            BodyBuilder builder = new BodyBuilder();
+            builder.TextBody = $"Hey User, this is just a test; Number {number}";
+
+            message.Subject = $"Email Routed {number}";
+            message.Body = builder.ToMessageBody();
+
+            try
+            {
+                SmtpClient smtpClient = new SmtpClient();
+                smtpClient.Connect("localhost", 25, MailKit.Security.SecureSocketOptions.Auto);
+
+                smtpClient.Send(message, new MailboxAddress(from), new List<MailboxAddress>() { new MailboxAddress(toHeader) });
+
+                smtpClient.Disconnect(true);
+
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Unable to send email to Local Smtp");
+                Console.WriteLine($"Error: {e.Message}");
+                Console.WriteLine($"StackTrace: {e.StackTrace}");
+                Console.WriteLine();
+            }
+        }
+
+        private static void SendGmail()
+        {
+            MimeMessage m = new MimeMessage();
+            m.From.Add(new MailboxAddress("user@gmail.com"));
+            m.To.Add(new MailboxAddress("user2@autoliv.com"));
+            m.Subject = "Routed Mesage";
+
+            BodyBuilder bodyBuilder = new BodyBuilder();
+            bodyBuilder.TextBody = "Mail To is Autoliv, but mailboxaddress is Gmail";
+
+            m.Body = bodyBuilder.ToMessageBody();
+
+            SmtpClient smtpClient = new SmtpClient();
+            smtpClient.Connect("smtp.gmail.com", 25, MailKit.Security.SecureSocketOptions.Auto);
+            smtpClient.Authenticate("user@gmail.com", "password");
+
+            
+            List<MailboxAddress> mailboxAddresses = new List<MailboxAddress>()
+            {
+                new MailboxAddress("user@gmail.com"),
+                new MailboxAddress("user2@jdemasters.com"),
             };
 
-            //var message = new System.Net.Mail.MailMessage(from, to);
-            //message.Subject = $"Email routed with default SMTP Client {number}";
-            //message.Body = $"Hey, this is just a test; Number {number}";
+            smtpClient.Send(m, new MailboxAddress("user@gmail.com"), mailboxAddresses);
 
-            //client.Send(from, to, "Email routed with default SMTP Client", "This is just a test");
-            
+            smtpClient.Disconnect(true);
+
         }
     }
 }

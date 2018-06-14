@@ -42,19 +42,15 @@ namespace SMTPRouter.Models
         /// <summary>
         /// Checks if the email sender belongs to the <see cref="Domain"/>
         /// </summary>
-        /// <param name="mimeMessage">The Message to Check</param>
+        /// <param name="routableMessage">The Message to Check</param>
         /// <returns>A <see cref="bool"/> to inform whether the rule matches or not</returns>
-        public override bool Match(MimeMessage mimeMessage)
+        public override bool Match(RoutableMessage routableMessage)
         {
-            // Ensure there is only one sender
-            if (mimeMessage.From.Count != 1) return false;
-
             // Get the MailFrom from the Message
-            MailboxAddress mailFrom = mimeMessage.From[0] as MailboxAddress;
-            if (mailFrom == null) return false;
+            if (routableMessage.MailFrom == null) return false;
 
             // Get the Domain of the Mail From
-            var mailFromContents = mailFrom.Address.Split('@');
+            var mailFromContents = routableMessage.MailFrom.Address.Split('@');
             if (mailFromContents.Length < 2) return false;
 
             // Try to match rule

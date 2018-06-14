@@ -17,8 +17,6 @@ namespace SMTPRouter
         public QueuesNotInitializedException(): this(null)
         {
 
-
-
         }
 
         /// <summary>
