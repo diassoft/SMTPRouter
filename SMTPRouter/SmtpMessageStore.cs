@@ -1,9 +1,11 @@
 ﻿using MimeKit;
+using SMTPRouter.Models;
 using SmtpServer;
 using SmtpServer.Mail;
 using SmtpServer.Storage;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -42,9 +44,22 @@ namespace SMTPRouter
         {
             try
             {
+                // The Routable Message
+                RoutableMessage routableMessage = new RoutableMessage();
+                routableMessage.CreationDateTime = DateTime.Now;
+
+                // Retrieve the Mail From
+                routableMessage.MailFrom = new MailboxAddress(string.Format("{0}@{1}",
+                                                              transaction.From.User,
+                                                              transaction.From.Host));
+
+                // Retrieve the Mail To
+                foreach (var mailTo in transaction.To)
+                    routableMessage.Recipients.Add(new MailboxAddress($"{mailTo.User}@{mailTo.Host}"));
+
                 // Gets the Message Contents and parse it to a MimeMessage
                 var textMessage = (ITextMessage)transaction.Message;
-                var mimeMessage = MimeKit.MimeMessage.Load(textMessage.Content);
+                routableMessage.Message = MimeKit.MimeMessage.Load(textMessage.Content);
 
                 // Retrieve information for the ReceivedBy header
                 var sourceIpAddress = ((IPEndPoint)context.RemoteEndPoint).Address.ToString();
@@ -58,10 +73,10 @@ namespace SMTPRouter
                                                     DateTime.Now.ToString("ddd, dd MMM yyy HH’:’mm’:’ss ‘GMT"));
 
                 // Append Received-By to the MimeMessage Header
-                mimeMessage.Headers.Add(HeaderId.Received, receiveByString);
+                routableMessage.Message.Headers.Add(HeaderId.Received, receiveByString);
 
                 // Trigger Event to inform a message was received
-                MessageReceived?.Invoke(this, new MessageEventArgs(mimeMessage));
+                MessageReceived?.Invoke(this, new MessageEventArgs(routableMessage));
             }
             catch
             {

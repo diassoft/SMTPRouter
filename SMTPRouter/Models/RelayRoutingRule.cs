@@ -35,15 +35,12 @@ namespace SMTPRouter.Models
         /// <summary>
         /// Validates the rule
         /// </summary>
-        /// <param name="mimeMessage">The Message to be accepted</param>
+        /// <param name="routableMessage">The Message to be accepted</param>
         /// <returns>This rule will always return true. Use it when implementing a SMTP Relay to accept all messages and just route them another SMTP.</returns>
-        public override bool Match(MimeMessage mimeMessage)
+        public override bool Match(RoutableMessage routableMessage)
         {
             if (!String.IsNullOrEmpty(ReplaceMailFromAddress))
-            {
-                mimeMessage.From.Clear();
-                mimeMessage.From.Add(new MailboxAddress(ReplaceMailFromAddress));
-            }
+                routableMessage.MailFrom = new MailboxAddress(ReplaceMailFromAddress);
 
             return true;
         }

@@ -1,4 +1,4 @@
-# Smtp Router - v1.0.0.7
+# Smtp Router - v2.0.0.0
 [![nuget](https://img.shields.io/nuget/v/SmtpRouter.svg)](https://www.nuget.org/packages/SmtpRouter/) 
 ![GitHub release](https://img.shields.io/github/release/diassoft/SmtpRouter.svg)
 ![NuGet](https://img.shields.io/nuget/dt/SmtpRouter.svg)
@@ -7,17 +7,28 @@
 The SMTP Router is a intermediate SMTP server useful to intercept messages and route it to another smtp.
 
 It contains a `Listener` to capture Smtp messages and a `Router` that will route the message to another Smtp Server when it matches certain `RoutingRules`.
+It also contains a `Server` object that encapsulates both the `Listener` and the `Router`.
 
 These are some of the uses of an SMTP Router:
 * SMTP Relay Server
 * Switch the destination SMTP server based on the incoming message. This is especially useful when you have systems that can only accept one single SMTP configuration and you want to use more than one SMTP.
 * Use Multiple SMTPs to send messages, due to daily our hourly limits defined by the email provider (*in development*)
 
+This is a new release of the Smtp Router component, which is now on it's **major version 2**. Version 2 include the following features:
+
+* Improved performance enhancement by using multiple Smtp Connections (Several Improvements)
+* Better folder structure organization
+* File grouping when saving data in the Sent Folder
+* Removal of the **Retry** folder
+* Fix problem when the Smtp Envelope does not match the Mime Message headers
+
+>Implementations using previous versions will need to be modified when moving to **Major Version 2**.
+
 >If you wish to contact the creator of this component, you can make it thru the [Nuget.org](https://www.nuget.org/packages/SmtpRouter/) page or by email [olavodias@gmail.com](mailto:olavodias@gmail.com).
 
 ## In this repository
 
-* [SMTP Router Documentation](https://diassoft.github.io/SMTPRouter)
+* [SMTP Router Documentation](https://diassoft.github.io/SMTPRouter_v2000)
 * [How To Use It](#how-to-use-it)
     * [Prerequisites](#prerequisites)
     * [Using the Server object](#using-the-server-object)
@@ -51,10 +62,19 @@ The `Router` creates a folder structure containing the following queues:
 
 | Queue | Description | 
 | :--- | :--- |
-| *Outgoing* | Emails that need to be routed |
-| *Sent* | Emails that were routed successfully |
-| *Retry* | Emails that were not sent yet, but are still under the `MessageLifespan`. Those messages are sent back to the *Outgoing* queue.|
-| *Error* | Emails that were not sent and the `MessageLifespan` is expired. Those messages are no longer sent unless they are moved manually to the *Outgoing* queue.|
+| *Outgoing* | Emails that need to be enqueued |
+| *InQueue* | Emails that are queued to be routed |
+| *Error* | Emails that were not queued. Those messages are no longer sent unless they are moved manually to the *Outgoing* queue.|
+
+Each `SmtpConfiguration` will have its own set of folders, following the structure below:
+
+| Queue | Description | 
+| :--- | :--- |
+| *InQueue* | Routed emails waiting to be sent by any of the available Smtp Connections |
+| *Error* | Emails that were not sent. Those messages are no longer sent unless they are moved manually to the *Outgoing* queue at the Root level. |
+| *Sent* | Emails that were sent. By setting the `GroupingOption` parameter of the `SmtpConfiguration` object, you can define how the files will be grouped inside the `Sent` folder. |
+
+>Previous versions had a `Retry` queue. This is no longer available since it did not seem to be necessary to keep trying to send the same message many times.
 
 ### Prerequisites
 
@@ -93,6 +113,9 @@ var server = new SMTPRouter.Server("localhost", 25, false, false, "SMTPRouter", 
                 RequiresAuthentication = true,
                 User = "user@gmail.com",
                 Password = "",
+                SecureSocketOption = 1,
+                ActiveConnections = 2,
+                GroupingOption = FileGroupingOptions.GroupByDateAndHour,
             }
         },
         { "hotmail", new Models.SmtpConfiguration()
@@ -103,6 +126,9 @@ var server = new SMTPRouter.Server("localhost", 25, false, false, "SMTPRouter", 
                 RequiresAuthentication = true,
                 User = "user@hotmail.com",
                 Password = "",
+                SecureSocketOption = 1,
+                ActiveConnections = 1,
+                GroupingOption = FileGroupingOptions.GroupByDateAndHour,
             }
         }
     },
@@ -124,9 +150,10 @@ server.MessageRoutedSuccessfully += Server_MessageRoutedSuccessfully;
 server.MessageNotRouted += Server_MessageNotRouted;
 server.MessagePurging += Server_MessagePurging;
 server.MessagesPurged += Server_MessagesPurged;
+server.MessageNotSent += Server_MessageNotSent;_
 ```
 
-For more information, refer to the [Server Class](https://diassoft.github.io/SMTPRouter/html/T_SMTPRouter_Server.htm) in the documentation.
+For more information, refer to the [Server Class](https://diassoft.github.io/SMTPRouter_v2000/html/T_SMTPRouter_Server.htm) in the documentation.
 
 ### Using the Listener and Router Individually
 
@@ -199,7 +226,7 @@ Task.WhenAll(listener.StartAsync(CancellationToken.None),
              router.StartAsync(CancellationToken.None)).ConfigureAwait(false);
 ```
 
-For more information, refer to the [Listener Class](https://diassoft.github.io/SMTPRouter/html/T_SMTPRouter_Listener.htm) and the [Router Class](https://diassoft.github.io/SMTPRouter/html/T_SMTPRouter_Router.htm]) in the documentation.
+For more information, refer to the [Listener Class](https://diassoft.github.io/SMTPRouter_v2000/html/T_SMTPRouter_Listener.htm) and the [Router Class](https://diassoft.github.io/SMTPRouter_v2000/html/T_SMTPRouter_Router.htm]) in the documentation.
 
 ## Smtp Configuration
 
@@ -221,7 +248,9 @@ var smtpConfiguration = new SmtpConfiguration()
     UseSSL = false,
     User = "user@gmail.com",
     Password = "password",
-    SecureSocketOption = 1
+    SecureSocketOption = 1,
+    ActiveConnections = 2,
+    GroupingOption = FileGroupingOptions.GroupByDateAndHour
 };
 ```
 
@@ -239,7 +268,17 @@ Valid values for the `SecureSocketOption` are:
 
 When you set the `UseSSL` property to `true`, the system changes the port to `465` and the `SecureSocketOption` to `SslOnConnect`.
 
-For more information, refer to the [SmtpConfiguration](https://diassoft.github.io/SMTPRouter/html/T_SMTPRouter_Models_SmtpConfiguration.htm) in the documentation.
+In order to improve the performance, you can define how many Smtp Connections will be created by setting the property `ActiveConnections`. If you leave it `0`, the system will create only `1` connection.
+
+When messages are sent, you can define `Sent` folder will have sub-folders per Date or per Date and Hour. Valid values for `GroupingOption` are:
+
+| Value | Description | Usage |
+| :--- | :--- | :--- |
+| `0` | `NoGrouping` | Sent files will be copied to the Sent Folder |
+| `1` | `GroupByDate` | Sent files will be organized by Date on the Sent folder |
+| `2` | `GroupByDateAndHour` | Sent files will be organized by Date and Hour on the Sent folder |
+
+For more information, refer to the [SmtpConfiguration](https://diassoft.github.io/SMTPRouter_v2000/html/T_SMTPRouter_Models_SmtpConfiguration.htm) in the documentation.
 
 ## Routing Rules
 
@@ -298,7 +337,7 @@ public sealed class MyCustomRoutingRule: RoutingRule
         base.SmtpConfigurationKey = smtpConfigurationKey;
     }
 
-    public override bool Match(MimeMessage mimeMessage)
+    public override bool Match(RoutableMessage routableMessage)
     {
         return true;
     }
@@ -309,4 +348,4 @@ You have to override the method `Match` to provide a algorithm that validades th
 
 The `RoutingRule` object derives from an `ObservableObject`, which makes it compatible with **Mvvm Implementations**.
 
-For more information, refer to the [RoutingRule](https://diassoft.github.io/SMTPRouter/html/T_SMTPRouter_Models_RoutingRule.htm) in the documentation.
+For more information, refer to the [RoutingRule](https://diassoft.github.io/SMTPRouter_v2000/html/T_SMTPRouter_Models_RoutingRule.htm) in the documentation.

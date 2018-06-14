@@ -9,6 +9,23 @@ namespace SMTPRouter.Models
     /// </summary>
     public class SmtpConfiguration: Diassoft.Mvvm.ObservableObjectBase
     {
+        /// <summary>
+        /// The path for the Smtp Key working folders
+        /// </summary>
+        public WorkingFolders Folders { get; private set; }
+
+        /// <summary>
+        /// Sets the working directory of the folders
+        /// </summary>
+        /// <param name="rootDirectory">The root directory for the Folders</param>
+        public void SetWorkingDirectory(string rootDirectory)
+        {
+            // Create Folders structure
+            if (!String.IsNullOrEmpty(_Key))
+                Folders = new WorkingFolders(System.IO.Path.Combine(rootDirectory, Key), GroupingOption);
+            else
+                Folders = new WorkingFolders(System.IO.Path.Combine(rootDirectory, "UndefinedSmtp"), GroupingOption);
+        }
 
         private string _Key;
 
@@ -20,7 +37,6 @@ namespace SMTPRouter.Models
             get { return _Key; }
             set { SetProperty<string>(ref _Key, value); }
         }
-
 
         private string _Description;
 
@@ -99,6 +115,33 @@ namespace SMTPRouter.Models
         }
 
 
+        private int _ActiveConnections;
+
+        /// <summary>
+        /// The number of active connections for the SMTP
+        /// </summary>
+        /// <remarks>
+        /// The Default value is Zero. That means each time this SMTP Connection is to be used, the system will create a connection, send the message and disconnect.
+        /// When you have more than one active connection, the system will use the next available connection to send the message. If there are too many messages to be sent, messages will be on hold until a SMTP Connection is avalable.
+        /// Try to limit your active connections to 10 (ten).
+        /// </remarks>
+        public int ActiveConnections
+        {
+            get { return _ActiveConnections; }
+            set { SetProperty<int>(ref _ActiveConnections, value); }
+        }
+
+        private int _QueueNumber;
+
+        /// <summary>
+        /// The number of the Queue. This is used by the Router to help find the queue on the array.
+        /// </summary>
+        internal int QueueNumber
+        {
+            get { return _QueueNumber; }
+            set { SetProperty<int>(ref _QueueNumber, value); }
+        }
+
         private int _SecureSocketOption;
 
         /// <summary>
@@ -121,6 +164,17 @@ namespace SMTPRouter.Models
         }
 
 
+        private FileGroupingOptions _GroupingOption;
+
+        /// <summary>
+        /// The <see cref="FileGroupingOptions"/> to define how to group the messages in the Sent folder
+        /// </summary>
+        public FileGroupingOptions GroupingOption
+        {
+            get { return _GroupingOption; }
+            set { SetProperty<FileGroupingOptions>(ref _GroupingOption, value); }
+        }
+
         /// <summary>
         /// Initializes a new instance of the SMTP Configuration
         /// </summary>
@@ -133,7 +187,31 @@ namespace SMTPRouter.Models
             RequiresAuthentication = false;
 
             SecureSocketOption = 0;
+
+            GroupingOption = 0;
+
+            // Set Queue Number
+            QueueNumber = 0;
         }
 
+    }
+
+    /// <summary>
+    /// Grouping options for the files on the Sent folder
+    /// </summary>
+    public enum FileGroupingOptions: int
+    {
+        /// <summary>
+        /// All files will be saved on the root folder
+        /// </summary>
+        NoGrouping = 0,
+        /// <summary>
+        /// All files will be saved on a folder per day
+        /// </summary>
+        GroupByDate = 1,
+        /// <summary>
+        /// All files will be saved on a folder per day and hour
+        /// </summary>
+        GroupByDateAndHour = 2
     }
 }
