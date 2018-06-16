@@ -18,10 +18,10 @@ namespace SMTPRouter.Test
     {
         // Testing Smtp Connection Variables (Replace here)
         static string Smtp_Gmail_User = "diassoft.test@gmail.com";
-        static string Smtp_Gmail_Pwd = "";
+        static string Smtp_Gmail_Pwd = "Diassoft2018";
 
         static string Smtp_Hotmail_User = "diassoft.test@hotmail.com";
-        static string Smtp_Hotmail_Pwd = "";
+        static string Smtp_Hotmail_Pwd = "Diassoft2018";
 
         static void Main(string[] args)
         {

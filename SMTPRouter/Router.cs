@@ -586,11 +586,11 @@ namespace SMTPRouter
         /// <remarks>This method is expected to run into multiple tasks, hence it uses a <see cref="ConcurrentQueue{T}"/></remarks>
         private void SendRoutedMessages(int connectionNumber, SmtpConfiguration smtpConfiguration, CancellationToken cancellationToken)
         {
+            // Connects to the Smtp
+            SmtpClient client = new SmtpClient();
+
             try
             {
-                // Connects to the Smtp
-                SmtpClient client = new SmtpClient();
-
                 // Internal Method to Open the Smtp Connection
                 void _ConnectSmtp()
                 {
@@ -598,6 +598,17 @@ namespace SMTPRouter
 
                     try
                     {
+                        // Check Client Situation
+                        if (client != null)
+                        {
+                            if (client.IsConnected)
+                                client.Disconnect(true);
+                        }
+
+                        // Restarts the Client
+                        client = new SmtpClient();
+
+                        // Tries to connect
                         client.Connect(smtpConfiguration.Host,
                                        smtpConfiguration.Port,
                                        (MailKit.Security.SecureSocketOptions)smtpConfiguration.SecureSocketOption);
@@ -614,6 +625,11 @@ namespace SMTPRouter
                     }
                     catch (Exception e)
                     {
+                        // Disconnect if connected
+                        if (client != null)
+                            if (client.IsConnected)
+                                client.Disconnect(true);
+
                         // Notify the connection did not happen
                         var newException = new SmtpConnectionFailedException(smtpConfiguration, hasConnected, false, e);
                         SmtpNotConnected?.Invoke(this, new SmtpConnectionEventArgs(smtpConfiguration, newException));
@@ -629,6 +645,13 @@ namespace SMTPRouter
                     try
                     {
                         // Try to issue a NoOp command to ensure the connection is still alive
+                        if (client == null)
+                            throw new Exception("Client is unavailable");
+
+                        if (!client.IsConnected)
+                            throw new Exception("Client is unavailable");
+
+                        // Issues the Dummy Command just to ensure the client is indeed alive
                         client.NoOp();
                     }
                     catch
@@ -694,10 +717,7 @@ namespace SMTPRouter
                         // Wait for a few seconds before trying again
                         Task.Delay(3000).Wait(cancellationToken);
                     }
-                }
-
-                // Disconnects if cancellation token has changed
-                client.Disconnect(true);
+                }                
             }
             catch (Exception e)
             {
@@ -706,6 +726,11 @@ namespace SMTPRouter
             }
             finally
             {
+                // Disconnects client if needed
+                if (client != null)
+                    if (client.IsConnected)
+                        client.Disconnect(true);
+
                 // Notify that the Smtp Connection has been closed
                 SmtpConnectionEnded?.Invoke(this, new SmtpConnectionEventArgs(smtpConfiguration, connectionNumber, null));
             }
