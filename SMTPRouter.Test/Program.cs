@@ -16,6 +16,13 @@ namespace SMTPRouter.Test
 {
     class Program
     {
+        // Testing Smtp Connection Variables (Replace here)
+        static string Smtp_Gmail_User = "diassoft.test@gmail.com";
+        static string Smtp_Gmail_Pwd = "Diassoft2018";
+
+        static string Smtp_Hotmail_User = "diassoft.test@hotmail.com";
+        static string Smtp_Hotmail_Pwd = "Diassoft2018";
+
         static void Main(string[] args)
         {
             // Decide what to test
@@ -84,26 +91,27 @@ namespace SMTPRouter.Test
                 {
                     { "gmail", new Models.SmtpConfiguration()
                         {
-                            Key = "Gmail",
+                            Key = "gmail",
                             Host = "smtp.gmail.com",
                             Description = "Google Mail SMTP",
                             Port = 587,
                             RequiresAuthentication = true,
-                            User = "user@gmail.com",
-                            Password = "",
+                            User = Smtp_Gmail_User,
+                            Password = Smtp_Gmail_Pwd,
                             SecureSocketOption = 1,
-                            ActiveConnections = 1,
+                            ActiveConnections = 4,
                             GroupingOption = FileGroupingOptions.GroupByDateAndHour
                         }
                     },
                     { "hotmail", new Models.SmtpConfiguration()
                         {
+                            Key = "hotmail",
                             Host = "smtp.live.com",
                             Description = "Hotmail SMTP",
                             Port = 587,
                             RequiresAuthentication = true,
-                            User = "user@hotmail.com",
-                            Password = "",
+                            User = Smtp_Hotmail_User,
+                            Password = Smtp_Hotmail_Pwd,
                             SecureSocketOption = 1,
                             ActiveConnections = 1,
                             GroupingOption = FileGroupingOptions.GroupByDateAndHour
@@ -120,6 +128,7 @@ namespace SMTPRouter.Test
                 server.Listener.SessionCompleted += Server_SessionCompleted;
                 server.Listener.ListeningStarted += Server_ListeningStarted;
                 server.Listener.MessageReceived += Server_MessageReceived;
+                server.Listener.MessageReceivedWithErrors += Server_MessageReceivedWithErrors;
             });
 
             server.RouterStarted += ((o, e) =>
@@ -130,6 +139,9 @@ namespace SMTPRouter.Test
                 server.Router.MessagesPurged += Server_MessagesPurged;
                 server.Router.MessageNotSent += Server_MessageNotSent;
                 server.Router.MessageSentSuccessfully += Server_MessageSentSuccessfully;
+                server.Router.SmtpConnectedSuccessfully += Server_SmtpConnectedSuccessfully;
+                server.Router.SmtpNotConnected += Server_SmtpNotConnected;
+                server.Router.SmtpConnectionEnded += Server_SmtpConnectionEnded;
             });
 
             // Initialize Services
@@ -141,17 +153,13 @@ namespace SMTPRouter.Test
             // Send 20 Emails
             for (int iMail = 1; iMail <= 20; iMail++)
             {
-                //SendEmail("user@gmail.com", "user@gmail.com", iMail);
-                //SendEmailTweakHeader("user@gmail.com", new List<string>() { "user@gmail.com" }, new List<string>() { "user@gmail.com", "user2@gmail.com" }, iMail);
-                //SendEmailBcc("user@gmail.com", new List<string>() { "user@gmail.com" }, new List<string>() { "user@hotmail.com" }, iMail);
+                SendEmail(Smtp_Gmail_User, Smtp_Gmail_User, iMail);
+                //SendEmailTweakHeader(Smtp_Gmail_User, new List<string>() { Smtp_Gmail_User }, new List<string>() { Smtp_Gmail_User, Smtp_Gmail_User }, iMail);
+                //SendEmailBcc(Smtp_Gmail_User, new List<string>() { Smtp_Gmail_User }, new List<string>() { Smtp_Hotmail_User }, iMail);
             }
-            
-            //SendEmail("user@gmail.com", "user@gmail.com", 1);
-            //SendEmail("user@hotmail.com", "user@hotmail.com", 2);
-            //SendEmail(new MailboxAddress("User Name", "user@gmail.com"), new MailboxAddress("User Name", "user@gmail.com"), 3);
 
-            //SendEmailUsingDefaultClient("user@gmail.com", "user@gmail.com;user2@gmail.com", 10);
-            //SendEmailUsingDefaultClient("user@hotmail.com", "user@hotmail.com", 10);
+            //SendEmail(Smtp_Gmail_User, Smtp_Gmail_User, 1);
+            //SendEmail(Smtp_Hotmail_User, Smtp_Hotmail_User, 2);
         }
 
 
@@ -187,8 +195,8 @@ namespace SMTPRouter.Test
                             Description = "Google Mail SMTP",
                             Port = 25,
                             RequiresAuthentication = true,
-                            User = "user@gmail.com",
-                            Password = "",
+                            User = Smtp_Gmail_User,
+                            Password = Smtp_Gmail_Pwd,
                         }
                     },
                     { "hotmail", new Models.SmtpConfiguration()
@@ -197,8 +205,8 @@ namespace SMTPRouter.Test
                             Description = "Hotmail SMTP",
                             Port = 25,
                             RequiresAuthentication = true,
-                            User = "user@hotmail.com",
-                            Password = "",
+                            User = Smtp_Hotmail_User,
+                            Password = Smtp_Hotmail_Pwd,
                         }
                     }
                 },
@@ -217,16 +225,49 @@ namespace SMTPRouter.Test
             // Initialize Services
             Task.WhenAll(listener.StartAsync(CancellationToken.None),
                          router.StartAsync(CancellationToken.None)).ConfigureAwait(false);
-
-            // Pause Routing
-            //server.Router.IsPaused = true;
-
-            // Send Emails
-            SendEmail("user@gmail.com", "user@gmail.com", 10);
-            SendEmail("user@hotmail.com", "user@hotmail.com", 22);
         }
 
         #region Event Handlers
+
+        private static void Server_SmtpConnectionEnded(object sender, SmtpConnectionEventArgs e)
+        {
+            Console.WriteLine("--------------------------------------------------------------------------------");
+            Console.WriteLine("Smtp Connection Ended");
+            Console.WriteLine($"    Key....................: {e.SmtpConfiguration.Key}");
+            Console.WriteLine($"    Host...................: {e.SmtpConfiguration.Host}");
+            Console.WriteLine($"    Connection Number......: {e.ConnectionNumber}");
+            Console.WriteLine("--------------------------------------------------------------------------------");
+        }
+
+        private static void Server_SmtpConnectedSuccessfully(object sender, SmtpConnectionEventArgs e)
+        {
+            Console.WriteLine("--------------------------------------------------------------------------------");
+            Console.WriteLine("Smtp Connected Successfully");
+            Console.WriteLine($"    Key....................: {e.SmtpConfiguration.Key}");
+            Console.WriteLine($"    Host...................: {e.SmtpConfiguration.Host}");
+            Console.WriteLine("--------------------------------------------------------------------------------");
+
+        }
+
+        private static void Server_SmtpNotConnected(object sender, SmtpConnectionEventArgs e)
+        {
+            Console.WriteLine("--------------------------------------------------------------------------------");
+            Console.WriteLine("**** ERROR ****: Smtp Connection Failed");
+            Console.WriteLine("Exception:");
+            Console.WriteLine($"   Error..........: {e.Exception.Message}");
+            Console.WriteLine($"   Stack Trace....: {e.Exception.StackTrace}");
+
+            if (e.Exception.InnerException != null)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Inner Exception:");
+                Console.WriteLine($"   Error..........: {e.Exception.InnerException.Message}");
+                Console.WriteLine($"   Stack Trace....: {e.Exception.InnerException.StackTrace}");
+            }
+
+            Console.WriteLine("--------------------------------------------------------------------------------");
+            Console.WriteLine();
+        }
 
         private static void Server_MessagesPurged(object sender, PurgeFilesEventArgs e)
         {
@@ -253,19 +294,20 @@ namespace SMTPRouter.Test
         {
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine("**** ERROR ****: Message Not Routed!");
-            Console.WriteLine($"From....: {((MailboxAddress)e.RoutableMessage.MailFrom).Address.ToString()}");
-            Console.WriteLine($"To......: {String.Join(",", (from t in e.RoutableMessage.Recipients where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
+            Console.WriteLine($"From........: {((MailboxAddress)e.RoutableMessage.MailFrom).Address.ToString()}");
+            Console.WriteLine($"To..........: {String.Join(",", (from t in e.RoutableMessage.Recipients where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
+            Console.WriteLine($"Subject.....: {e.RoutableMessage.Message.Subject}");
             Console.WriteLine();
             Console.WriteLine("Exception:");
-            Console.WriteLine($"   Error..........: {e.Exception.Message}");
-            Console.WriteLine($"   Stack Trace....: {e.Exception.StackTrace}");
+            Console.WriteLine($"   Error..............: {e.Exception.Message}");
+            Console.WriteLine($"   Stack Trace........: {e.Exception.StackTrace}");
 
             if (e.Exception.InnerException != null)
             {
                 Console.WriteLine();
                 Console.WriteLine("Inner Exception:");
-                Console.WriteLine($"   Error..........: {e.Exception.InnerException.Message}");
-                Console.WriteLine($"   Stack Trace....: {e.Exception.InnerException.StackTrace}");
+                Console.WriteLine($"   Error..............: {e.Exception.InnerException.Message}");
+                Console.WriteLine($"   Stack Trace........: {e.Exception.InnerException.StackTrace}");
             }
 
             Console.WriteLine("--------------------------------------------------------------------------------");
@@ -276,8 +318,9 @@ namespace SMTPRouter.Test
         {
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine("Message Routed Successfully!");
-            Console.WriteLine($"From....: {((MailboxAddress)e.RoutableMessage.MailFrom).Address.ToString()}");
-            Console.WriteLine($"To......: {String.Join(",", (from t in e.RoutableMessage.Recipients where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
+            Console.WriteLine($"From........: {((MailboxAddress)e.RoutableMessage.MailFrom).Address.ToString()}");
+            Console.WriteLine($"To..........: {String.Join(",", (from t in e.RoutableMessage.Recipients where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
+            Console.WriteLine($"Subject.....: {e.RoutableMessage.Message.Subject}");
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine();
         }
@@ -286,8 +329,9 @@ namespace SMTPRouter.Test
         {
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine("Message Sent Successfully!");
-            Console.WriteLine($"From....: {((MailboxAddress)e.RoutableMessage.MailFrom).Address.ToString()}");
-            Console.WriteLine($"To......: {String.Join(",", (from t in e.RoutableMessage.Recipients where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
+            Console.WriteLine($"From........: {((MailboxAddress)e.RoutableMessage.MailFrom).Address.ToString()}");
+            Console.WriteLine($"To..........: {String.Join(",", (from t in e.RoutableMessage.Recipients where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
+            Console.WriteLine($"Subject.....: {e.RoutableMessage.Message.Subject}");
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine();
         }
@@ -314,10 +358,36 @@ namespace SMTPRouter.Test
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine("A message was received!!");
             Console.WriteLine();
-            Console.WriteLine($"From....: {((MailboxAddress)e.RoutableMessage.MailFrom).Address.ToString()}");
-            Console.WriteLine($"To......: {String.Join(",", (from t in e.RoutableMessage.Recipients where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
+            Console.WriteLine($"From........: {((MailboxAddress)e.RoutableMessage.MailFrom).Address.ToString()}");
+            Console.WriteLine($"To..........: {String.Join(",", (from t in e.RoutableMessage.Recipients where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
+            Console.WriteLine($"Subject.....: {e.RoutableMessage.Message.Subject}");
             Console.WriteLine();
             Console.WriteLine(e.RoutableMessage.ToString());
+            Console.WriteLine("--------------------------------------------------------------------------------");
+            Console.WriteLine();
+        }
+
+        private static void Server_MessageReceivedWithErrors(object sender, MessageErrorEventArgs e)
+        {
+            Console.WriteLine();
+            Console.WriteLine("--------------------------------------------------------------------------------");
+            Console.WriteLine("**** ERROR ****: A message was received with errors!!");
+            Console.WriteLine();
+            Console.WriteLine($"From........: {((MailboxAddress)e.RoutableMessage.MailFrom).Address.ToString()}");
+            Console.WriteLine($"To..........: {String.Join(",", (from t in e.RoutableMessage.Recipients where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
+            Console.WriteLine();
+            Console.WriteLine("Exception:");
+            Console.WriteLine($"   Error..........: {e.Exception.Message}");
+            Console.WriteLine($"   Stack Trace....: {e.Exception.StackTrace}");
+
+            if (e.Exception.InnerException != null)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Inner Exception:");
+                Console.WriteLine($"   Error..........: {e.Exception.InnerException.Message}");
+                Console.WriteLine($"   Stack Trace....: {e.Exception.InnerException.StackTrace}");
+            }
+
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine();
         }
@@ -331,8 +401,9 @@ namespace SMTPRouter.Test
         {
             Console.WriteLine("--------------------------------------------------------------------------------");
             Console.WriteLine("**** ERROR ****: Message Not Sent!");
-            Console.WriteLine($"From....: {((MailboxAddress)e.RoutableMessage.MailFrom).Address.ToString()}");
-            Console.WriteLine($"To......: {String.Join(",", (from t in e.RoutableMessage.Recipients where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
+            Console.WriteLine($"From........: {((MailboxAddress)e.RoutableMessage.MailFrom).Address.ToString()}");
+            Console.WriteLine($"To..........: {String.Join(",", (from t in e.RoutableMessage.Recipients where t is MailboxAddress select ((MailboxAddress)t).Address.ToString()))}");
+            Console.WriteLine($"Subject.....: {e.RoutableMessage.Message.Subject}");
             Console.WriteLine();
             Console.WriteLine("Exception:");
             Console.WriteLine($"   Error..........: {e.Exception.Message}");
@@ -525,27 +596,27 @@ namespace SMTPRouter.Test
         private static void SendGmail()
         {
             MimeMessage m = new MimeMessage();
-            m.From.Add(new MailboxAddress("user@gmail.com"));
-            m.To.Add(new MailboxAddress("user2@autoliv.com"));
+            m.From.Add(new MailboxAddress(Smtp_Gmail_User));
+            m.To.Add(new MailboxAddress(Smtp_Gmail_User));
             m.Subject = "Routed Mesage";
 
             BodyBuilder bodyBuilder = new BodyBuilder();
-            bodyBuilder.TextBody = "Mail To is Autoliv, but mailboxaddress is Gmail";
+            bodyBuilder.TextBody = "Another Test Email";
 
             m.Body = bodyBuilder.ToMessageBody();
 
             SmtpClient smtpClient = new SmtpClient();
             smtpClient.Connect("smtp.gmail.com", 25, MailKit.Security.SecureSocketOptions.Auto);
-            smtpClient.Authenticate("user@gmail.com", "password");
+            smtpClient.Authenticate(Smtp_Gmail_User, Smtp_Gmail_Pwd);
 
             
             List<MailboxAddress> mailboxAddresses = new List<MailboxAddress>()
             {
-                new MailboxAddress("user@gmail.com"),
-                new MailboxAddress("user2@jdemasters.com"),
+                new MailboxAddress(Smtp_Gmail_User),
+                new MailboxAddress(Smtp_Gmail_User),
             };
 
-            smtpClient.Send(m, new MailboxAddress("user@gmail.com"), mailboxAddresses);
+            smtpClient.Send(m, new MailboxAddress(Smtp_Gmail_User), mailboxAddresses);
 
             smtpClient.Disconnect(true);
 

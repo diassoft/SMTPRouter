@@ -26,6 +26,11 @@ namespace SMTPRouter
         public event EventHandler<MessageEventArgs> MessageReceived;
 
         /// <summary>
+        /// Event triggered when a message is received but with errors
+        /// </summary>
+        public event EventHandler<MessageErrorEventArgs> MessageReceivedWithErrors;
+
+        /// <summary>
         /// Initializes a new instance of the SmtpMessageStore
         /// </summary>
         public SmtpMessageStore()
@@ -42,11 +47,12 @@ namespace SMTPRouter
         /// <returns></returns>
         public override Task<SmtpServer.Protocol.SmtpResponse> SaveAsync(ISessionContext context, IMessageTransaction transaction, CancellationToken cancellationToken)
         {
+            // The Routable Message
+            RoutableMessage routableMessage = new RoutableMessage();
+            routableMessage.CreationDateTime = DateTime.Now;
+
             try
             {
-                // The Routable Message
-                RoutableMessage routableMessage = new RoutableMessage();
-                routableMessage.CreationDateTime = DateTime.Now;
 
                 // Retrieve the Mail From
                 routableMessage.MailFrom = new MailboxAddress(string.Format("{0}@{1}",
@@ -78,8 +84,11 @@ namespace SMTPRouter
                 // Trigger Event to inform a message was received
                 MessageReceived?.Invoke(this, new MessageEventArgs(routableMessage));
             }
-            catch
+            catch (Exception e)
             {
+                // Notify listener
+                MessageReceivedWithErrors?.Invoke(this, new MessageErrorEventArgs(routableMessage, e));
+                
                 // Something failed
                 return Task.FromResult(SmtpServer.Protocol.SmtpResponse.TransactionFailed);
             }

@@ -161,6 +161,21 @@ namespace SMTPRouter
         public event EventHandler<PurgeFilesEventArgs> MessagesPurged;
 
         /// <summary>
+        /// Event triggered after the Smtp Connection is successfull
+        /// </summary>
+        public event EventHandler<SmtpConnectionEventArgs> SmtpConnectedSuccessfully;
+
+        /// <summary>
+        /// Event triggered after the Smtp Connection failed
+        /// </summary>
+        public event EventHandler<SmtpConnectionEventArgs> SmtpNotConnected;
+
+        /// <summary>
+        /// Event triggered when a thread processing an specific Smtp Connection has ended
+        /// </summary>
+        public event EventHandler<SmtpConnectionEventArgs> SmtpConnectionEnded;
+
+        /// <summary>
         /// Event triggered when a general error happens on the processing
         /// </summary>
         /// <remarks>Usually general errors stop the processing so it's important to handle this event</remarks>
@@ -349,7 +364,10 @@ namespace SMTPRouter
                 }
 
                 // Add to the concurrent queue
-                MessagesToRouteQueue.Enqueue(routableMessage);
+                lock (MessagesToRouteQueue)
+                {
+                    MessagesToRouteQueue.Enqueue(routableMessage);
+                }
 
                 // Notify the message has been queued
                 MessageQueuedSuccessfully?.Invoke(this, new MessageEventArgs(routableMessage));
@@ -396,8 +414,13 @@ namespace SMTPRouter
                 dirInfo = new DirectoryInfo(kvp.Value.Folders.InQueueFolder);
                 files = dirInfo.EnumerateFiles("*.EML");
 
-                foreach (FileInfo fi in files)
-                    SmtpQueues[kvp.Value.QueueNumber].Enqueue(RoutableMessage.LoadFromFile(fi.FullName));
+                lock (SmtpQueues[kvp.Value.QueueNumber])
+                {
+                    foreach (FileInfo fi in files)
+                    {
+                        SmtpQueues[kvp.Value.QueueNumber].Enqueue(RoutableMessage.LoadFromFile(fi.FullName));
+                    }
+                }
             }
         }
 
@@ -441,7 +464,16 @@ namespace SMTPRouter
                 if (!IsPaused)
                 {
                     // Pull next message from the queue
-                    if (MessagesToRouteQueue.TryDequeue(out RoutableMessage routableMessage))
+                    bool Dequeued = false;
+                    RoutableMessage routableMessage = null;
+                    
+                    // Lock the Queue to Ensure Thread-Safety
+                    lock (MessagesToRouteQueue)
+                    {
+                        Dequeued = MessagesToRouteQueue.TryDequeue(out routableMessage);
+                    }
+
+                    if ((Dequeued) && (routableMessage != null))
                     {
                         // The Message Current Location
                         string FileCurrentLocation = routableMessage.FileName;
@@ -517,7 +549,15 @@ namespace SMTPRouter
                         catch (Exception e)
                         {
                             // Move the message to the retry or error folder
-                            File.Move(FileCurrentLocation, Path.Combine(Folders.ErrorFolder, Path.GetFileName(FileCurrentLocation)));
+                            try
+                            {
+                                File.Move(FileCurrentLocation, Path.Combine(Folders.ErrorFolder, Path.GetFileName(FileCurrentLocation)));
+                            }
+                            catch (Exception e2)
+                            {
+                                // That is a very unlikely situation 
+                                GeneralError?.Invoke(this, new GeneralErrorEventArgs(new Exception("Unable to move file to Error Folder", e2), nameof(RouteMessages)));
+                            }
 
                             // Notify the message was not routed
                             MessageNotRouted?.Invoke(this, new MessageErrorEventArgs(routableMessage, new MessageNotRoutedException(routableMessage, e)));
@@ -546,22 +586,54 @@ namespace SMTPRouter
         /// <remarks>This method is expected to run into multiple tasks, hence it uses a <see cref="ConcurrentQueue{T}"/></remarks>
         private void SendRoutedMessages(int connectionNumber, SmtpConfiguration smtpConfiguration, CancellationToken cancellationToken)
         {
+            // Connects to the Smtp
+            SmtpClient client = new SmtpClient();
+
             try
             {
-                // Connects to the Smtp
-                SmtpClient client = new SmtpClient();
-
                 // Internal Method to Open the Smtp Connection
                 void _ConnectSmtp()
                 {
-                    client.Connect(smtpConfiguration.Host,
-                                   smtpConfiguration.Port,
-                                   (MailKit.Security.SecureSocketOptions)smtpConfiguration.SecureSocketOption);
+                    bool hasConnected = false;
 
-                    if (smtpConfiguration.RequiresAuthentication)
+                    try
                     {
-                        client.Authenticate(smtpConfiguration.User,
-                                            smtpConfiguration.Password);
+                        // Check Client Situation
+                        if (client != null)
+                        {
+                            if (client.IsConnected)
+                                client.Disconnect(true);
+                        }
+
+                        // Restarts the Client
+                        client = new SmtpClient();
+
+                        // Tries to connect
+                        client.Connect(smtpConfiguration.Host,
+                                       smtpConfiguration.Port,
+                                       (MailKit.Security.SecureSocketOptions)smtpConfiguration.SecureSocketOption);
+                        hasConnected = true;
+
+                        if (smtpConfiguration.RequiresAuthentication)
+                        {
+                            client.Authenticate(smtpConfiguration.User,
+                                                smtpConfiguration.Password);
+                        }
+
+                        // Notify the connection happened successfully
+                        SmtpConnectedSuccessfully?.Invoke(this, new SmtpConnectionEventArgs(smtpConfiguration));
+                    }
+                    catch (Exception e)
+                    {
+                        // Disconnect if connected
+                        if (client != null)
+                            if (client.IsConnected)
+                                client.Disconnect(true);
+
+                        // Notify the connection did not happen
+                        var newException = new SmtpConnectionFailedException(smtpConfiguration, hasConnected, false, e);
+                        SmtpNotConnected?.Invoke(this, new SmtpConnectionEventArgs(smtpConfiguration, newException));
+                        throw newException;
                     }
                 }
 
@@ -573,6 +645,13 @@ namespace SMTPRouter
                     try
                     {
                         // Try to issue a NoOp command to ensure the connection is still alive
+                        if (client == null)
+                            throw new Exception("Client is unavailable");
+
+                        if (!client.IsConnected)
+                            throw new Exception("Client is unavailable");
+
+                        // Issues the Dummy Command just to ensure the client is indeed alive
                         client.NoOp();
                     }
                     catch
@@ -590,7 +669,15 @@ namespace SMTPRouter
                     }
 
                     // Pull a message from the queue
-                    if (SmtpQueues[smtpConfiguration.QueueNumber].TryDequeue(out RoutableMessage routableMessage))
+                    RoutableMessage routableMessage = null;
+                    bool Dequeued = false;
+
+                    lock (SmtpQueues[smtpConfiguration.QueueNumber])
+                    {
+                        Dequeued = SmtpQueues[smtpConfiguration.QueueNumber].TryDequeue(out routableMessage);
+                    }
+
+                    if ((Dequeued) && (routableMessage != null))
                     {
                         try
                         {
@@ -630,15 +717,22 @@ namespace SMTPRouter
                         // Wait for a few seconds before trying again
                         Task.Delay(3000).Wait(cancellationToken);
                     }
-                }
-
-                // Disconnects if cancellation token has changed
-                client.Disconnect(true);
+                }                
             }
             catch (Exception e)
             {
-                // NOthing else to try, notifies system about the issue
+                // Nothing else to try, notifies system about the issue
                 GeneralError?.Invoke(this, new GeneralErrorEventArgs(new Exception("Smtp Queue could not be initialized", e), nameof(SendRoutedMessages)));
+            }
+            finally
+            {
+                // Disconnects client if needed
+                if (client != null)
+                    if (client.IsConnected)
+                        client.Disconnect(true);
+
+                // Notify that the Smtp Connection has been closed
+                SmtpConnectionEnded?.Invoke(this, new SmtpConnectionEventArgs(smtpConfiguration, connectionNumber, null));
             }
         }
 
