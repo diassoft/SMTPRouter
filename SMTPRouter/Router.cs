@@ -115,6 +115,19 @@ namespace SMTPRouter
         /// </summary>
         public TimeSpan MessagePurgeLifespan { get; set; }
 
+        /// <summary>
+        /// List of Administrators of the system, separated by semicolon. Leave it blank if you do not want messages to be sent to administrators.
+        /// </summary>
+        /// <remarks>
+        /// Administrators can be notified in case something goes wrong with the service
+        /// </remarks>
+        public string AdministratorsEmail { get; set; }
+
+        /// <summary>
+        /// The system email account, to be used as the mail sender when messages are sent from the system itself.
+        /// </summary>
+        public string SystemEmail { get; set; }
+
         #endregion Properties
 
         #region Events
@@ -578,6 +591,64 @@ namespace SMTPRouter
         }
 
         /// <summary>
+        /// Connects to the Smtp using the Smtp Configuration
+        /// </summary>
+        /// <param name="smtpClient">Reference to the Smtp Client that holds the connection. It can be a null variable.</param>
+        /// <param name="smtpConfiguration">The Smtp Configuration</param>
+        /// <returns>A <see cref="bool"/> to define whether the connection was successful or not</returns>
+        private bool ConnectToSmtp(ref SmtpClient smtpClient, SmtpConfiguration smtpConfiguration)
+        {
+            // Temporary SmtpClient
+            SmtpClient tempClient;
+            bool hasConnected = false;
+
+            // Check Client Situation
+            if (smtpClient != null)
+            {
+                // If client is already connected, just return true
+                if (smtpClient.IsConnected)
+                    return true;
+            }
+
+            try
+            {
+                // Initialize Client
+                tempClient = new SmtpClient();
+
+                // Set Timeout (5 minutes)
+                tempClient.Timeout = 5 * 60 * 1000;
+
+                // Tries to connect
+                tempClient.Connect(smtpConfiguration.Host,
+                                   smtpConfiguration.Port,
+                                   (MailKit.Security.SecureSocketOptions)smtpConfiguration.SecureSocketOption);
+
+                hasConnected = true;
+
+                if (smtpConfiguration.RequiresAuthentication)
+                {
+                    tempClient.Authenticate(smtpConfiguration.User,
+                                             smtpConfiguration.Password);
+                }
+
+                // Notify the connection happened successfully
+                SmtpConnectedSuccessfully?.Invoke(this, new SmtpConnectionEventArgs(smtpConfiguration));
+
+                // Set the return variable to the tempClient
+                smtpClient = tempClient;
+
+                // Notify the connection worked
+                return true;
+            }
+            catch (Exception e)
+            {
+                var newException = new SmtpConnectionFailedException(smtpConfiguration, hasConnected, false, e);
+                SmtpNotConnected?.Invoke(this, new SmtpConnectionEventArgs(smtpConfiguration, newException));
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Process the Smtp Queue for messages already routed
         /// </summary>
         /// <param name="connectionNumber">The number of the connection on the same queue. This information is inserted on the header of the MimeMessage</param>
@@ -591,83 +662,8 @@ namespace SMTPRouter
 
             try
             {
-                // Internal Method to Open the Smtp Connection
-                void _ConnectSmtp()
-                {
-                    bool hasConnected = false;
-
-                    try
-                    {
-                        // Check Client Situation
-                        if (client != null)
-                        {
-                            if (client.IsConnected)
-                                client.Disconnect(true);
-                        }
-
-                        // Restarts the Client
-                        client = new SmtpClient();
-
-                        // Tries to connect
-                        client.Connect(smtpConfiguration.Host,
-                                       smtpConfiguration.Port,
-                                       (MailKit.Security.SecureSocketOptions)smtpConfiguration.SecureSocketOption);
-                        hasConnected = true;
-
-                        if (smtpConfiguration.RequiresAuthentication)
-                        {
-                            client.Authenticate(smtpConfiguration.User,
-                                                smtpConfiguration.Password);
-                        }
-
-                        // Notify the connection happened successfully
-                        SmtpConnectedSuccessfully?.Invoke(this, new SmtpConnectionEventArgs(smtpConfiguration));
-                    }
-                    catch (Exception e)
-                    {
-                        // Disconnect if connected
-                        if (client != null)
-                            if (client.IsConnected)
-                                client.Disconnect(true);
-
-                        // Notify the connection did not happen
-                        var newException = new SmtpConnectionFailedException(smtpConfiguration, hasConnected, false, e);
-                        SmtpNotConnected?.Invoke(this, new SmtpConnectionEventArgs(smtpConfiguration, newException));
-                        throw newException;
-                    }
-                }
-
-                // Connects to the Smtp
-                _ConnectSmtp();
-
                 while (cancellationToken.IsCancellationRequested == false)
                 {
-                    try
-                    {
-                        // Try to issue a NoOp command to ensure the connection is still alive
-                        if (client == null)
-                            throw new Exception("Client is unavailable");
-
-                        if (!client.IsConnected)
-                            throw new Exception("Client is unavailable");
-
-                        // Issues the Dummy Command just to ensure the client is indeed alive
-                        client.NoOp();
-                    }
-                    catch
-                    {
-                        // Connection is no longer alive, reopen
-                        try
-                        {
-                            _ConnectSmtp();
-                        }
-                        catch
-                        {
-                            throw;
-                        }
-                        
-                    }
-
                     // Pull a message from the queue
                     RoutableMessage routableMessage = null;
                     bool Dequeued = false;
@@ -695,7 +691,42 @@ namespace SMTPRouter
                             if (!Directory.Exists(SentFolder)) Directory.CreateDirectory(SentFolder);
 
                             // Sends the message with the active connection
-                            client.Send(routableMessage.Message, routableMessage.MailFrom, routableMessage.Recipients);
+                            bool messageSent = false;
+
+                            while (!messageSent)
+                            {
+                                try
+                                {
+                                    // Ensure to create a connection or use the existing
+                                    if (ConnectToSmtp(ref client, smtpConfiguration))
+                                    {
+                                        // Sends the message
+                                        client.Send(routableMessage.Message, routableMessage.MailFrom, routableMessage.Recipients);
+                                        messageSent = true;
+                                    }
+                                    else
+                                    {
+                                        // Something happened, give it a few seconds before trying again
+                                        Task.Delay(2000).Wait(cancellationToken);
+                                    }
+                                }
+                                catch (Exception e1)
+                                {
+                                    // An error happened, unless the cancellation is requested, keep trying
+                                    if (cancellationToken.IsCancellationRequested)
+                                    {
+                                        throw e1;
+                                    }
+                                    else
+                                    {
+                                        // Notify that a message was not Sent
+                                        MessageNotSent?.Invoke(this, new MessageErrorEventArgs(routableMessage, e1));
+
+                                        // Give it some time before trying again to connect on this loop
+                                        Task.Delay(2000).Wait(cancellationToken);
+                                    }
+                                }
+                            }
 
                             // Move file to the sent folder
                             File.Move(routableMessage.FileName, Path.Combine(SentFolder, Path.GetFileName(routableMessage.FileName)));
@@ -816,6 +847,7 @@ namespace SMTPRouter
         }
 
         #endregion Queue Methods
+
     }
         
 }
