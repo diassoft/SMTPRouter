@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Linq;
 using System.Xml.Serialization;
 using System.Collections.Concurrent;
+using SMTPRouter.Extensions;
 
 namespace SMTPRouter
 {
@@ -596,25 +597,14 @@ namespace SMTPRouter
         /// <param name="smtpClient">Reference to the Smtp Client that holds the connection. It can be a null variable.</param>
         /// <param name="smtpConfiguration">The Smtp Configuration</param>
         /// <returns>A <see cref="bool"/> to define whether the connection was successful or not</returns>
-        private bool ConnectToSmtp(ref SmtpClient smtpClient, SmtpConfiguration smtpConfiguration)
+        private bool TryConnectToSmtp(ref SmtpClient smtpClient, SmtpConfiguration smtpConfiguration)
         {
             // Temporary SmtpClient
-            SmtpClient tempClient;
+            SmtpClient tempClient = new SmtpClient();
             bool hasConnected = false;
-
-            // Check Client Situation
-            if (smtpClient != null)
-            {
-                // If client is already connected, just return true
-                if (smtpClient.IsConnected)
-                    return true;
-            }
 
             try
             {
-                // Initialize Client
-                tempClient = new SmtpClient();
-
                 // Set Timeout (5 minutes)
                 tempClient.Timeout = 5 * 60 * 1000;
 
@@ -644,6 +634,7 @@ namespace SMTPRouter
             {
                 var newException = new SmtpConnectionFailedException(smtpConfiguration, hasConnected, false, e);
                 SmtpNotConnected?.Invoke(this, new SmtpConnectionEventArgs(smtpConfiguration, newException));
+
                 return false;
             }
         }
@@ -660,9 +651,13 @@ namespace SMTPRouter
             // Connects to the Smtp
             SmtpClient client = new SmtpClient();
 
-            try
+            // Control the Number of Attempts
+            int attempts = 0;
+            int maxAttempts = 20;
+
+            while (cancellationToken.IsCancellationRequested == false)
             {
-                while (cancellationToken.IsCancellationRequested == false)
+                try
                 {
                     // Pull a message from the queue
                     RoutableMessage routableMessage = null;
@@ -693,16 +688,42 @@ namespace SMTPRouter
                             // Sends the message with the active connection
                             bool messageSent = false;
 
-                            while (!messageSent)
+                            // Reset attempts
+                            attempts = 0;
+
+                            while ((!messageSent) && (attempts <= maxAttempts))
                             {
+                                // Increment number of attempts
+                                attempts++;
+
                                 try
                                 {
-                                    // Ensure to create a connection or use the existing
-                                    if (ConnectToSmtp(ref client, smtpConfiguration))
+                                    // Ensure to create a connection
+                                    if (TryConnectToSmtp(ref client, smtpConfiguration))
                                     {
-                                        // Sends the message
-                                        client.Send(routableMessage.Message, routableMessage.MailFrom, routableMessage.Recipients);
-                                        messageSent = true;
+                                        // Tries to send the message
+                                        if (client.TrySend(routableMessage.Message, routableMessage.MailFrom, routableMessage.Recipients, out Exception eSendException ))
+                                        {
+                                            messageSent = true;
+
+                                            // Move file to the sent folder
+                                            File.Move(routableMessage.FileName, Path.Combine(SentFolder, Path.GetFileName(routableMessage.FileName)));
+
+                                            // Notify that a message has been sent
+                                            MessageSentSuccessfully?.Invoke(this, new MessageEventArgs(routableMessage));
+                                        }
+                                        else
+                                        {
+                                            // Notify the message has not been sent
+                                            MessageNotSent?.Invoke(this, new MessageErrorEventArgs(routableMessage, eSendException));
+
+                                            // Something happened, give it a few seconds before trying again
+                                            Task.Delay(2000).Wait(cancellationToken);
+                                        }
+
+                                        // Disconnect the client
+                                        if (client.IsConnected)
+                                            client.Disconnect(true);
                                     }
                                     else
                                     {
@@ -710,33 +731,26 @@ namespace SMTPRouter
                                         Task.Delay(2000).Wait(cancellationToken);
                                     }
                                 }
-                                catch (Exception e1)
+                                catch
                                 {
-                                    // An error happened, unless the cancellation is requested, keep trying
-                                    if (cancellationToken.IsCancellationRequested)
-                                    {
-                                        throw e1;
-                                    }
-                                    else
-                                    {
-                                        // Notify that a message was not Sent
-                                        MessageNotSent?.Invoke(this, new MessageErrorEventArgs(routableMessage, e1));
-
-                                        // Give it some time before trying again to connect on this loop
-                                        Task.Delay(2000).Wait(cancellationToken);
-                                    }
+                                    // Give it some time before trying again to connect on this loop
+                                    Task.Delay(2000).Wait(cancellationToken);
                                 }
                             }
 
-                            // Move file to the sent folder
-                            File.Move(routableMessage.FileName, Path.Combine(SentFolder, Path.GetFileName(routableMessage.FileName)));
-
-                            // Notify that a message has been sent
-                            MessageSentSuccessfully?.Invoke(this, new MessageEventArgs(routableMessage));
+                            // Check if message is still not sent
+                            if (!messageSent)
+                            {
+                                if (attempts == maxAttempts)
+                                    throw new MessageNotSentException(routableMessage, new Exception($"Reached the limit of attempts to send the message ({maxAttempts} times) without any success"));
+                                else
+                                    throw new MessageNotSentException(routableMessage, new Exception($"Unable to send the message after {attempts} attempts"));
+                            }
+                                
                         }
                         catch (Exception e)
                         {
-                            // Message Expired the Lifespan, send it to the error queue
+                            // Move message to the error queue
                             File.Move(routableMessage.FileName, Path.Combine(smtpConfiguration.Folders.ErrorFolder, Path.GetFileName(routableMessage.FileName)));
 
                             // Notify that a message was not Sent
@@ -748,23 +762,23 @@ namespace SMTPRouter
                         // Wait for a few seconds before trying again
                         Task.Delay(3000).Wait(cancellationToken);
                     }
-                }                
+                }
+                catch (Exception e)
+                {
+                    // Nothing else to try, notifies system about the issue
+                    GeneralError?.Invoke(this, new GeneralErrorEventArgs(new Exception($"General Error on '{nameof(SendRoutedMessages)}' method", e), nameof(SendRoutedMessages)));
+                }
+                finally
+                {
+                    // Disconnects client if needed
+                    if (client != null)
+                        if (client.IsConnected)
+                            client.Disconnect(true);
+                }
             }
-            catch (Exception e)
-            {
-                // Nothing else to try, notifies system about the issue
-                GeneralError?.Invoke(this, new GeneralErrorEventArgs(new Exception("Smtp Queue could not be initialized", e), nameof(SendRoutedMessages)));
-            }
-            finally
-            {
-                // Disconnects client if needed
-                if (client != null)
-                    if (client.IsConnected)
-                        client.Disconnect(true);
 
-                // Notify that the Smtp Connection has been closed
-                SmtpConnectionEnded?.Invoke(this, new SmtpConnectionEventArgs(smtpConfiguration, connectionNumber, null));
-            }
+            // Notify that the Smtp Connection has been closed
+            SmtpConnectionEnded?.Invoke(this, new SmtpConnectionEventArgs(smtpConfiguration, connectionNumber, null));
         }
 
         #endregion Message Processing Methods

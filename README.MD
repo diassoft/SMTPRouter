@@ -1,4 +1,4 @@
-# Smtp Router - v2.4.0.0
+# Smtp Router - v2.5.0.0
 [![nuget](https://img.shields.io/nuget/v/SmtpRouter.svg)](https://www.nuget.org/packages/SmtpRouter/) 
 ![GitHub release](https://img.shields.io/github/release/diassoft/SmtpRouter.svg)
 ![NuGet](https://img.shields.io/nuget/dt/SmtpRouter.svg)
@@ -21,7 +21,8 @@ This is a new release of the Smtp Router component, which is now on it's **major
 * File grouping when saving data in the Sent Folder
 * Removal of the **Retry** folder
 * Fix problem when the Smtp Envelope does not match the Mime Message headers
-* Fix the problem with connection timeout
+* Fix the problem with connection timeout (force the system to reconnect)
+* Fix the problem when reloading messages from files
 
 >Implementations using previous versions will need to be modified when moving to **Major Version 2**.
 
