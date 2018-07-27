@@ -1,4 +1,4 @@
-# Smtp Router - v2.5.0.0
+# Smtp Router - v2.6.0.0
 [![nuget](https://img.shields.io/nuget/v/SmtpRouter.svg)](https://www.nuget.org/packages/SmtpRouter/) 
 ![GitHub release](https://img.shields.io/github/release/diassoft/SmtpRouter.svg)
 ![NuGet](https://img.shields.io/nuget/dt/SmtpRouter.svg)
@@ -23,6 +23,7 @@ This is a new release of the Smtp Router component, which is now on it's **major
 * Fix problem when the Smtp Envelope does not match the Mime Message headers
 * Fix the problem with connection timeout (force the system to reconnect)
 * Fix the problem when reloading messages from files
+* Changed Headers to Custom Headers (`X-SM-Received` and `X-SM-SentBy`)
 
 >Implementations using previous versions will need to be modified when moving to **Major Version 2**.
 

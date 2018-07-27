@@ -673,13 +673,16 @@ namespace SMTPRouter
                         try
                         {
                             // Append details to the header
-                            var receiveByString = string.Format("from Queue [{0}] at Connection [{1}] of Smtp Key [{2}] with Smtp Router Service; {3}",
+                            var receiveByString = string.Format("Queue [{0}] at Connection [{1}] of Smtp Key [{2}] with Smtp Router Service; {3}",
                                                                 (smtpConfiguration.QueueNumber+1),
                                                                 connectionNumber,
                                                                 smtpConfiguration.Key,
-                                                                DateTime.Now.ToString("ddd, dd MMM yyy HH’:’mm’:’ss ‘GMT"));
+                                                                DateTime.Now.ToString("ddd, dd MMM yyy HH:mm:ss %K"));
 
-                            routableMessage.Message.Headers.Add(HeaderId.Received, receiveByString);
+                            routableMessage.Message.Headers.Add("X-SM-SentBy", receiveByString);
+
+                            // Append File Name to the Header
+                            routableMessage.Message.Headers.Add("X-SM-FileName", Path.GetFileName(routableMessage.FileName));
 
                             // Create folder to store sent files
                             string SentFolder = smtpConfiguration.Folders.SentFolderWithGroupingOptions(routableMessage.CreationDateTime);

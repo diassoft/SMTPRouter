@@ -160,8 +160,9 @@ namespace SMTPRouter.Test
             // Pause Routing
             //server.Router.IsPaused = true;
 
-            // Send 20 Emails
-            for (int iMail = 1; iMail <= 20; iMail++)
+            // Send Emails
+            int numberOfEmails = 20;
+            for (int iMail = 1; iMail <= numberOfEmails; iMail++)
             {
                 SendEmail(Smtp_Gmail_User, Smtp_Gmail_User, iMail);
                 //SendEmailTweakHeader(Smtp_Gmail_User, new List<string>() { Smtp_Gmail_User }, new List<string>() { Smtp_Gmail_User, Smtp_Gmail_User }, iMail);
