@@ -76,10 +76,10 @@ namespace SMTPRouter
                                                     sourceIpAddress,
                                                     machineHostName,
                                                     machineIpAddress,
-                                                    DateTime.Now.ToString("ddd, dd MMM yyy HH’:’mm’:’ss ‘GMT"));
+                                                    DateTime.Now.ToString("ddd, dd MMM yyy HH:mm:ss %K"));
 
                 // Append Received-By to the MimeMessage Header
-                routableMessage.Message.Headers.Add(HeaderId.Received, receiveByString);
+                routableMessage.Message.Headers.Add("X-SM-Received", receiveByString);
 
                 // Trigger Event to inform a message was received
                 MessageReceived?.Invoke(this, new MessageEventArgs(routableMessage));

@@ -33,6 +33,8 @@ namespace SMTPRouter.Test
             Console.WriteLine("SMTP Routing");
             Console.WriteLine("   1 - Test Using a Server Component");
             Console.WriteLine("   2 - Test Using Listener and Router Individually");
+            Console.WriteLine("   3 - Write Message to File");
+            Console.WriteLine("   4 - Load Message from File");
             Console.WriteLine();
             Console.WriteLine("Other");
             Console.WriteLine("  90 - Create a Routing Rule dynamically");
@@ -49,6 +51,14 @@ namespace SMTPRouter.Test
             else if (answer == "2")
             {
                 TestIndividual();
+            }
+            else if (answer == "3")
+            {
+                WriteMessageToFile();
+            }
+            else if (answer == "4")
+            {
+                LoadMessageFromFile();
             }
             else if (answer == "90")
             {
@@ -150,8 +160,9 @@ namespace SMTPRouter.Test
             // Pause Routing
             //server.Router.IsPaused = true;
 
-            // Send 20 Emails
-            for (int iMail = 1; iMail <= 20; iMail++)
+            // Send Emails
+            int numberOfEmails = 20;
+            for (int iMail = 1; iMail <= numberOfEmails; iMail++)
             {
                 SendEmail(Smtp_Gmail_User, Smtp_Gmail_User, iMail);
                 //SendEmailTweakHeader(Smtp_Gmail_User, new List<string>() { Smtp_Gmail_User }, new List<string>() { Smtp_Gmail_User, Smtp_Gmail_User }, iMail);
@@ -609,7 +620,7 @@ namespace SMTPRouter.Test
             smtpClient.Connect("smtp.gmail.com", 25, MailKit.Security.SecureSocketOptions.Auto);
             smtpClient.Authenticate(Smtp_Gmail_User, Smtp_Gmail_Pwd);
 
-            
+
             List<MailboxAddress> mailboxAddresses = new List<MailboxAddress>()
             {
                 new MailboxAddress(Smtp_Gmail_User),
@@ -620,6 +631,31 @@ namespace SMTPRouter.Test
 
             smtpClient.Disconnect(true);
 
+        }
+
+        private static void WriteMessageToFile()
+        {
+            MimeMessage message = new MimeMessage();
+            message.From.Add(new MailboxAddress(Smtp_Gmail_User));
+            message.To.Add(new MailboxAddress(Smtp_Gmail_User));
+            message.Subject = "Message Written to File";
+
+            BodyBuilder bodyBuilder = new BodyBuilder();
+            bodyBuilder.TextBody = "This is a test message";
+            message.Body = bodyBuilder.ToMessageBody();
+
+            using (var lStream = System.IO.File.Create("C:\\SMTPRouter2\\WrittenFile.eml"))
+            {
+                message.WriteTo(lStream);
+                lStream.Flush();
+            }
+        }
+
+        private static void LoadMessageFromFile()
+        {
+            MimeMessage message = MimeMessage.Load("C:\\SMTPRouter2\\WrittenFile.eml");
+
+            Console.WriteLine("Loaded");
         }
     }
 }

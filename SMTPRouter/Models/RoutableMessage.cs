@@ -148,7 +148,7 @@ namespace SMTPRouter.Models
                 // Defines the format of the file
                 FormatOptions dosLineFormat = new FormatOptions()
                 {
-                    NewLineFormat = NewLineFormat.Dos,
+                    NewLineFormat = NewLineFormat.Dos,                    
                 };
 
                 // Prepare File Output
@@ -157,7 +157,7 @@ namespace SMTPRouter.Models
                     // Creates a stream for the header
                     using (MemoryStream streamHeader = new MemoryStream())
                     {
-                        using (StreamWriter streamHeaderWriter = new StreamWriter(streamHeader))
+                        using (StreamWriter streamHeaderWriter = new StreamWriter(streamHeader, Encoding.GetEncoding(28592)))
                         {
                             // Ensure to not Automatically Flush
                             streamHeaderWriter.AutoFlush = false;
@@ -225,10 +225,10 @@ namespace SMTPRouter.Models
                     string line = "";
 
                     // Reader for the Text File
-                    using (StreamReader fileStreamReader = new StreamReader(fileStream))
+                    using (StreamReader fileStreamReader = new StreamReader(fileStream, Encoding.GetEncoding(28592)))
                     {
                         // Writer for the Message Stream
-                        using (StreamWriter messageStreamWriter = new StreamWriter(messageStream))
+                        using (StreamWriter messageStreamWriter = new StreamWriter(messageStream, Encoding.GetEncoding(28592)))
                         {
                             // Flag to define whether the system is reading the header or not anymore
                             bool inHeader = true;
@@ -277,20 +277,16 @@ namespace SMTPRouter.Models
                                                 routableMessage.CreationDateTime = DateTime.Now;
                                         }
                                     }
-                                }
-                                else
-                                {
-                                    // No longer in header
-                                    inHeader = false;
-
-                                    // Add current line to the memory stream
-                                    messageStreamWriter.Write(line);
+                                    else if (line.StartsWith(SMTPROUTER_HEADER_END))
+                                    {
+                                        // No longer in header
+                                        inHeader = false;
+                                    }
                                 }
                             }
 
                             // Add remaining lines
-                            while ((!fileStreamReader.EndOfStream))
-                                messageStreamWriter.WriteLine(fileStreamReader.ReadLine());
+                            messageStreamWriter.Write(fileStreamReader.ReadToEnd());
 
                             // Load Message
                             messageStream.Position = 0;
