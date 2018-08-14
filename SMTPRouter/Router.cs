@@ -129,6 +129,18 @@ namespace SMTPRouter
         /// </summary>
         public string SystemEmail { get; set; }
 
+        /// <summary>
+        /// A list of IP addresses to accept messages from
+        /// </summary>
+        /// <remarks>An Empty List means all IP addresses will be accepted</remarks>
+        public List<string> AcceptedIPAddresses { get; set; }
+
+        /// <summary>
+        /// A list of IP addresses to reject messages from
+        /// </summary>
+        /// <remarks>An Empty List means no rejections will be made</remarks>
+        public List<string> RejectedIPAddresses { get; set; }
+
         #endregion Properties
 
         #region Events
@@ -256,12 +268,17 @@ namespace SMTPRouter
             DestinationSmtps = new Dictionary<string, SmtpConfiguration>();
             RoutingRules = new List<RoutingRule>();
 
+            // Initialize IP Addresses Collections
+            AcceptedIPAddresses = new List<string>();
+            RejectedIPAddresses = new List<string>();
+
             // Initialize Queues
             try
             {
                 // Create Folders if they do not exist already
                 if (!Directory.Exists(Folders.OutgoingFolder)) Directory.CreateDirectory(Folders.OutgoingFolder);
                 if (!Directory.Exists(Folders.InQueueFolder)) Directory.CreateDirectory(Folders.InQueueFolder);
+                if (!Directory.Exists(Folders.RejectedFolder)) Directory.CreateDirectory(Folders.RejectedFolder);
                 if (!Directory.Exists(Folders.ErrorFolder)) Directory.CreateDirectory(Folders.ErrorFolder);
             }
             catch (Exception e)
@@ -495,6 +512,24 @@ namespace SMTPRouter
                         // Route the message that just came from the queue
                         try
                         {
+                            // Validate Incoming IP Address (unless the Force Routing flag is set)
+                            if (!routableMessage.ForceRouting)
+                            {
+                                if (AcceptedIPAddresses?.Count > 0)
+                                {
+                                    // Check if Incoming IP Address is on the list
+                                    if (!AcceptedIPAddresses.Contains(routableMessage.IPAddress))
+                                        throw new UnauthorizedSenderException(routableMessage, RejectReasons.NotInAcceptedAddressesList);
+                                }
+
+                                if (RejectedIPAddresses?.Count > 0)
+                                {
+                                    // Check if Incoming IP Address is on the rejection list
+                                    if (RejectedIPAddresses.Contains(routableMessage.IPAddress))
+                                        throw new UnauthorizedSenderException(routableMessage, RejectReasons.ExistsInRejectedAddressesList);
+                                }
+                            }
+
                             // Validate Rules
                             if (RoutingRules == null)
                                 throw new Exception("No rules configured to process routing. The message will be sent to the Error Queue after exceeding the Maximum Number of Attempts.");
@@ -559,6 +594,22 @@ namespace SMTPRouter
 
                             // Notify the message was routed
                             MessageRoutedSuccessfully?.Invoke(this, new MessageEventArgs(routableMessage));
+                        }
+                        catch (UnauthorizedSenderException e)
+                        {
+                            // Move the message to the Rejected folder
+                            try
+                            {
+                                File.Move(FileCurrentLocation, Path.Combine(Folders.RejectedFolder, Path.GetFileName(FileCurrentLocation)));
+                            }
+                            catch (Exception e2)
+                            {
+                                // That is a very unlikely situation 
+                                GeneralError?.Invoke(this, new GeneralErrorEventArgs(new Exception("Unable to move file to Rejected Folder", e2), nameof(RouteMessages)));
+                            }
+
+                            // Notify the message was not routed
+                            MessageNotRouted?.Invoke(this, new MessageErrorEventArgs(routableMessage, e));
                         }
                         catch (Exception e)
                         {

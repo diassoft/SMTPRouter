@@ -49,14 +49,24 @@ namespace SMTPRouter
     ///     },
     /// };
     /// 
-    /// // Hook Events
-    /// server.SessionCreated += Server_SessionCreated;
-    /// server.SessionCommandExecuting += Server_SessionCommandExecuting;
-    /// server.SessionCompleted += Server_SessionCompleted;
-    /// server.ListeningStarted += Server_ListeningStarted;
-    /// server.MessageReceived += Server_MessageReceived;
-    /// server.MessageRoutedSuccessfully += Server_MessageRoutedSuccessfully;
-    /// server.MessageNotRouted += Server_MessageNotRouted;
+    /// // Hook Listener Events
+    /// server.Listener.SessionCreated += Server_SessionCreated;
+    /// server.Listener.SessionCommandExecuting += Server_SessionCommandExecuting;
+    /// server.Listener.SessionCompleted += Server_SessionCompleted;
+    /// server.Listener.ListeningStarted += Server_ListeningStarted;
+    /// server.Listener.MessageReceived += Server_MessageReceived;
+    /// server.Listener.MessageReceivedWithErrors += Server_MessageReceivedWithErrors;
+    /// 
+    /// // Hook Router Events
+    /// server.Router.MessageRoutedSuccessfully += Server_MessageRoutedSuccessfully;
+    /// server.Router.MessageNotRouted += Server_MessageNotRouted;
+    /// server.Router.MessagePurging += Server_MessagePurging;
+    /// server.Router.MessagesPurged += Server_MessagesPurged;
+    /// server.Router.MessageNotSent += Server_MessageNotSent;
+    /// server.Router.MessageSentSuccessfully += Server_MessageSentSuccessfully;
+    /// server.Router.SmtpConnectedSuccessfully += Server_SmtpConnectedSuccessfully;
+    /// server.Router.SmtpNotConnected += Server_SmtpNotConnected;
+    /// server.Router.SmtpConnectionEnded += Server_SmtpConnectionEnded;
     /// 
     /// // Initialize Services
     /// Task.WhenAll(server.StartAsync(CancellationToken.None)).ConfigureAwait(false);

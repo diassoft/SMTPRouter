@@ -1,4 +1,4 @@
-# Smtp Router - v2.6.0.0
+# Smtp Router - v2.7.0
 [![nuget](https://img.shields.io/nuget/v/SmtpRouter.svg)](https://www.nuget.org/packages/SmtpRouter/) 
 ![GitHub release](https://img.shields.io/github/release/diassoft/SmtpRouter.svg)
 ![NuGet](https://img.shields.io/nuget/dt/SmtpRouter.svg)
@@ -12,20 +12,27 @@ It also contains a `Server` object that encapsulates both the `Listener` and the
 These are some of the uses of an SMTP Router:
 * SMTP Relay Server
 * Switch the destination SMTP server based on the incoming message. This is especially useful when you have systems that can only accept one single SMTP configuration and you want to use more than one SMTP.
+* Provide SMTP authentication for a system that does not have such feature
 * Use Multiple SMTPs to send messages, due to daily our hourly limits defined by the email provider (*in development*)
 
-This is a new release of the Smtp Router component, which is now on it's **major version 2**. Version 2 include the following features:
+This is a new release of the Smtp Router component, which is now on it's **major version 2**. 
 
-* Improved performance enhancement by using multiple Smtp Connections (Several Improvements)
-* Better folder structure organization
-* File grouping when saving data in the Sent Folder
-* Removal of the **Retry** folder
-* Fix problem when the Smtp Envelope does not match the Mime Message headers
-* Fix the problem with connection timeout (force the system to reconnect)
-* Fix the problem when reloading messages from files
-* Changed Headers to Custom Headers (`X-SM-Received` and `X-SM-SentBy`)
+Major Version 2 include the following features:
 
->Implementations using previous versions will need to be modified when moving to **Major Version 2**.
+| Feature | Version |
+| :--- | :--- |
+| Added functionality to Accept messages from certain IP Addresses only | 2.7.0 |
+| Added functionality to Reject messages from certain IP Addresses | 2.7.0 |
+| Changed Headers to Custom Headers (`X-SM-Received` and `X-SM-SentBy`) | 2.6.0 |
+| Fix the problem when reloading messages from files | 2.6.0 |
+| Fix the problem with connection timeout (force the system to reconnect) | 2.6.0 |
+| Fix problem when the Smtp Envelope does not match the Mime Message headers | 2.0.0 |
+| Removal of the **Retry** folder | 2.0.0 |
+| File grouping when saving data in the Sent Folder | 2.0.0 |
+| Better folder structure organization | 2.0.0 |
+| Improved performance enhancement by using multiple Smtp Connections (Several Improvements) | 2.0.0 |
+
+>Implementations using **Major Version 1** will need to be modified when moving to **Major Version 2**.
 
 >If you wish to contact the creator of this component, you can make it thru the [Nuget.org](https://www.nuget.org/packages/SmtpRouter/) page or by email [olavodias@gmail.com](mailto:olavodias@gmail.com).
 
@@ -39,6 +46,7 @@ This is a new release of the Smtp Router component, which is now on it's **major
     * [Using the Server object](#using-the-server-object)
 * [Smtp Configuration](#smtp-configuration)
 * [Routing Rules](#routing-rules)
+* [Accepting or Rejecting Messages](#accepting-or-rejecting-messages)
 
 ## Additional Repositories
 
@@ -143,17 +151,24 @@ Task.WhenAll(server.StartAsync(CancellationToken.None)).ConfigureAwait(false);
 The `Server` class triggers events when certain activities happen. You can hook to the events by using the code below:
 
 ```cs
-// Hook Events
-server.SessionCreated += Server_SessionCreated;
-server.SessionCommandExecuting += Server_SessionCommandExecuting;
-server.SessionCompleted += Server_SessionCompleted;
-server.ListeningStarted += Server_ListeningStarted;
-server.MessageReceived += Server_MessageReceived;
-server.MessageRoutedSuccessfully += Server_MessageRoutedSuccessfully;
-server.MessageNotRouted += Server_MessageNotRouted;
-server.MessagePurging += Server_MessagePurging;
-server.MessagesPurged += Server_MessagesPurged;
-server.MessageNotSent += Server_MessageNotSent;_
+// Hook Listener Events
+server.Listener.SessionCreated += Server_SessionCreated;
+server.Listener.SessionCommandExecuting += Server_SessionCommandExecuting;
+server.Listener.SessionCompleted += Server_SessionCompleted;
+server.Listener.ListeningStarted += Server_ListeningStarted;
+server.Listener.MessageReceived += Server_MessageReceived;
+server.Listener.MessageReceivedWithErrors += Server_MessageReceivedWithErrors;
+
+// Hook Router Events
+server.Router.MessageRoutedSuccessfully += Server_MessageRoutedSuccessfully;
+server.Router.MessageNotRouted += Server_MessageNotRouted;
+server.Router.MessagePurging += Server_MessagePurging;
+server.Router.MessagesPurged += Server_MessagesPurged;
+server.Router.MessageNotSent += Server_MessageNotSent;
+server.Router.MessageSentSuccessfully += Server_MessageSentSuccessfully;
+server.Router.SmtpConnectedSuccessfully += Server_SmtpConnectedSuccessfully;
+server.Router.SmtpNotConnected += Server_SmtpNotConnected;
+server.Router.SmtpConnectionEnded += Server_SmtpConnectionEnded;
 ```
 
 For more information, refer to the [Server Class](https://diassoft.github.io/SMTPRouter_v2000/html/T_SMTPRouter_Server.htm) in the documentation.
@@ -175,10 +190,13 @@ var listener = new SMTPRouter.Listener()
     RequiresAuthentication = false,
     UseSSL = false
 };
+
+// Hook Listener Events
 listener.SessionCreated += Server_SessionCreated;
 listener.SessionCommandExecuting += Server_SessionCommandExecuting;
 listener.SessionCompleted += Server_SessionCompleted;
 listener.ListeningStarted += Server_ListeningStarted;
+listener.MessageReceivedWithErrors += Server_MessageReceivedWithErrors;
 
 // Create the Router
 var router = new SMTPRouter.Router("SMTPRouter", "C:\\SMTPRouter\\Queues")
@@ -213,14 +231,23 @@ var router = new SMTPRouter.Router("SMTPRouter", "C:\\SMTPRouter\\Queues")
         }
     },
 };
+
+// Hook Router Events
 router.MessageRoutedSuccessfully += Server_MessageRoutedSuccessfully;
 router.MessageNotRouted += Server_MessageNotRouted;
+router.MessagePurging += Server_MessagePurging;
+router.MessagesPurged += Server_MessagesPurged;
+router.MessageNotSent += Server_MessageNotSent;
+router.MessageSentSuccessfully += Server_MessageSentSuccessfully;
+router.SmtpConnectedSuccessfully += Server_SmtpConnectedSuccessfully;
+router.SmtpNotConnected += Server_SmtpNotConnected;
+router.SmtpConnectionEnded += Server_SmtpConnectionEnded;
 
 // When the Listener have a message, it has to be sent to the Router. This is Automatic when you use the Server class
 listener.MessageReceived += (object sender, MessageEventArgs e) =>
 {
     // Make sure to enqueue the message otherwise the router doesn't know about anything
-    router.Enqueue(e.MimeMessage);
+    router.Enqueue(e.RoutableMessage);
 };
 listener.MessageReceived += Server_MessageReceived;
 
@@ -352,3 +379,35 @@ You have to override the method `Match` to provide a algorithm that validades th
 The `RoutingRule` object derives from an `ObservableObject`, which makes it compatible with **Mvvm Implementations**.
 
 For more information, refer to the [RoutingRule](https://diassoft.github.io/SMTPRouter_v2000/html/T_SMTPRouter_Models_RoutingRule.htm) in the documentation.
+
+## Accepting or Rejecting Messages
+
+The `Router` has two collections of IP Addresses named `AcceptedIPAddresses` and `RejectedIPAddresses`. They belong to the type `List<string>`.
+
+You can use those collections to define which IP Addresses are authorized to send messages or which IP Addresses are not allowed to send messages.
+
+### Accepting Messages from a specific sender
+
+On the example below, only messages sent by the IP Address `10.0.0.128` will be accepted by the SMTP Router. 
+
+```cs
+// To authorize a specific IP address to send messages
+Router.AcceptedIPAddresses.Add("10.0.0.128");
+```
+
+Messages not accepted are sent to the `Rejected` folder. You can force a message to be sent by adding `SmtpRouter-Header-ForceRouting` to the message header. 
+
+>When the `AcceptedIPAddresses` collection is empty, all senders are authorized to send messages. However, the system will still run the senders thru the `RejectedIPAddresses` collection.
+
+### Rejecting Messages from a specific sender
+
+On the example below, all messages sent by the IP Address `10.0.0.128` will be rejected by the SMTP Router.
+
+```cs
+// To reject messages from a specific IP address
+Router.RejectedIPAddresses.Add("10.0.0.128");
+```
+
+Messages rejected are sent to the `Rejected` folder. You can force a message to be sent by adding `SmtpRouter-Header-ForceRouting` to the message header.
+
+>When the `RejectedIPAddresses` collection is empty, all senders are authorized to send messages. However, the system checks for valid senders on the `AcceptedIPAddresses` collection first.

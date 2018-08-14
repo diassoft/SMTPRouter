@@ -109,7 +109,7 @@ namespace SMTPRouter.Test
                             User = Smtp_Gmail_User,
                             Password = Smtp_Gmail_Pwd,
                             SecureSocketOption = 1,
-                            ActiveConnections = 4,
+                            ActiveConnections = 1,
                             GroupingOption = FileGroupingOptions.GroupByDateAndHour
                         }
                     },
@@ -143,6 +143,9 @@ namespace SMTPRouter.Test
 
             server.RouterStarted += ((o, e) =>
             {
+                //server.Router.AcceptedIPAddresses.Add("127.0.0.1");
+                //server.Router.RejectedIPAddresses.Add("127.0.0.1");
+
                 server.Router.MessageRoutedSuccessfully += Server_MessageRoutedSuccessfully;
                 server.Router.MessageNotRouted += Server_MessageNotRouted;
                 server.Router.MessagePurging += Server_MessagePurging;
@@ -161,7 +164,7 @@ namespace SMTPRouter.Test
             //server.Router.IsPaused = true;
 
             // Send Emails
-            int numberOfEmails = 20;
+            int numberOfEmails = 10;
             for (int iMail = 1; iMail <= numberOfEmails; iMail++)
             {
                 SendEmail(Smtp_Gmail_User, Smtp_Gmail_User, iMail);
