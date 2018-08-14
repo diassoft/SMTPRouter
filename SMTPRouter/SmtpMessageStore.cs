@@ -81,6 +81,9 @@ namespace SMTPRouter
                 // Append Received-By to the MimeMessage Header
                 routableMessage.Message.Headers.Add("X-SM-Received", receiveByString);
 
+                // Set the IP Address
+                routableMessage.IPAddress = sourceIpAddress;
+
                 // Trigger Event to inform a message was received
                 MessageReceived?.Invoke(this, new MessageEventArgs(routableMessage));
             }

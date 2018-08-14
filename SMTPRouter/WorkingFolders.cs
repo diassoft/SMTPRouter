@@ -57,6 +57,10 @@ namespace SMTPRouter
         /// The folder where all messages that were not sent after the <see cref="Router.MessageLifespan"/> expires
         /// </summary>
         public string ErrorFolder { get { return System.IO.Path.Combine(RootFolder, "Error"); } }
+        /// <summary>
+        /// The folder where all rejected messages are stored
+        /// </summary>
+        public string RejectedFolder { get { return System.IO.Path.Combine(RootFolder, "Rejected"); } }
 
         /// <summary>
         /// Returns the folder where the messages sent should be stored, considering the file grouping options and date time

@@ -20,6 +20,8 @@ namespace SMTPRouter.Models
         internal const string SMTPROUTER_HEADER_TO = "SmtpRouter-Header-To";
         internal const string SMTPROUTER_HEADER_END = "SmtpRouter-Header-End";
         internal const string SMTPROUTER_HEADER_CREATIONTIME = "SmtpRouter-Header-CreationTime";
+        internal const string SMTPROUTER_HEADER_IPADDRESS = "SmtpRouter-Header-IPAddress";
+        internal const string SMTPROUTER_HEADER_FORCEROUTING = "SmtpRouter-Header-ForceRouting";
         internal const string SMTPROUTER_VERSION = "2.0.0.0";
 
         /// <summary>
@@ -58,6 +60,16 @@ namespace SMTPRouter.Models
             set { SetProperty<MimeMessage>(ref _Message, value); }
         }
 
+        private bool _ForceRouting;
+
+        /// <summary>
+        /// A flag to define whether the message will be routed even though the acceptance/rejection rules do not allow that
+        /// </summary>
+        public bool ForceRouting
+        {
+            get { return _ForceRouting; }
+            set { SetProperty<bool>(ref _ForceRouting, value); }
+        }
 
         private string _SmtpConfigurationKey;
 
@@ -68,6 +80,16 @@ namespace SMTPRouter.Models
         {
             get { return _SmtpConfigurationKey; }
             set { SetProperty<string>(ref _SmtpConfigurationKey, value); }
+        }
+
+        private string _IPAddress;
+        /// <summary>
+        /// The IP Address sending the message
+        /// </summary>
+        public string IPAddress
+        {
+            get { return _IPAddress; }
+            set { SetProperty<string>(ref _IPAddress, value); }
         }
 
         private MailboxAddress _MailFrom;
@@ -103,10 +125,7 @@ namespace SMTPRouter.Models
         /// <summary>
         /// Initializes a new instance of a Routing Message
         /// </summary>
-        public RoutableMessage(): this(null, null, new List<MailboxAddress>(), "")
-        {
-
-        }
+        public RoutableMessage(): this(null, null, new List<MailboxAddress>(), "") { }
 
         /// <summary>
         /// Initializes a new instance of a Routing Message
@@ -115,14 +134,24 @@ namespace SMTPRouter.Models
         /// <param name="mailFrom">A <see cref="MailboxAddress"/> containing the sender address</param>
         /// <param name="recipients">A <see cref="List{T}"/> of <see cref="MailboxAddress"/> containing all the recipients of the message</param>
         /// <param name="fileName">The full path of the message file</param>
-        public RoutableMessage(MimeMessage message, MailboxAddress mailFrom, List<MailboxAddress> recipients, string fileName)
+        public RoutableMessage(MimeMessage message, MailboxAddress mailFrom, List<MailboxAddress> recipients, string fileName): this(message, mailFrom, recipients, fileName, "") { }
+
+        /// <summary>
+        /// Initializes a new instance of a Routing Message
+        /// </summary>
+        /// <param name="message">The <see cref="MimeMessage"/> to be sent</param>
+        /// <param name="mailFrom">A <see cref="MailboxAddress"/> containing the sender address</param>
+        /// <param name="recipients">A <see cref="List{T}"/> of <see cref="MailboxAddress"/> containing all the recipients of the message</param>
+        /// <param name="ipAddress">A <see cref="string"/> containing the IP Address who originated the message</param>
+        /// <param name="fileName">The full path of the message file</param>
+        public RoutableMessage(MimeMessage message, MailboxAddress mailFrom, List<MailboxAddress> recipients, string fileName, string ipAddress)
         {
             _Message = message;
             _MailFrom = mailFrom;
             _Recipients = recipients;
             _FileName = fileName;
+            _IPAddress = ipAddress;
         }
-
 
         /// <summary>
         /// Saves the Routable Message to a file
@@ -167,6 +196,7 @@ namespace SMTPRouter.Models
                             streamHeaderWriter.WriteLine($"{SMTPROUTER_HEADER_VERSION}: {SMTPROUTER_VERSION}");
                             streamHeaderWriter.WriteLine($"{SMTPROUTER_HEADER_CREATIONTIME}: {CreationDateTime.ToString(SMTPROUTER_HEADER_CREATIONTIME_FORMAT)}");
                             streamHeaderWriter.WriteLine($"{SMTPROUTER_HEADER_FROM}: {MailFrom.Address.ToString()}");
+                            streamHeaderWriter.WriteLine($"{SMTPROUTER_HEADER_IPADDRESS}: {IPAddress}");
 
                             foreach (var mailTo in Recipients)
                                 streamHeaderWriter.WriteLine($"{SMTPROUTER_HEADER_TO}: {mailTo.Address.ToString()}");
@@ -275,6 +305,16 @@ namespace SMTPRouter.Models
                                                 routableMessage.CreationDateTime = dateTime;
                                             else
                                                 routableMessage.CreationDateTime = DateTime.Now;
+                                        }
+                                        else if (line.StartsWith(SMTPROUTER_HEADER_IPADDRESS))
+                                        {
+                                            // Load the Sender IP Address
+                                            routableMessage.IPAddress = tempHeader[1];
+                                        }
+                                        else if (line.StartsWith(SMTPROUTER_HEADER_FORCEROUTING))
+                                        {
+                                            // Sets the Force Routing Flag
+                                            routableMessage.ForceRouting = true;
                                         }
                                     }
                                     else if (line.StartsWith(SMTPROUTER_HEADER_END))
